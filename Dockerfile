@@ -10,10 +10,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies first (leverage Docker cache)
-# 先装依赖（利用 Docker 缓存）
+# Install dependencies
+# 安装依赖
+ARG CACHEBUST=1
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 # Copy project files / 复制项目文件
 COPY *.py .
