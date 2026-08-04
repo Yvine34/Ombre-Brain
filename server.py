@@ -166,6 +166,48 @@ _state_dir = config.get("state_dir") or os.path.join(
 )
 init_custom_domains(_state_dir)
 
+# --- Introspection log / 内省日志 ---
+_introspection_log_path = os.path.join(_state_dir, "introspection_log.jsonl")
+
+def _log_introspection(reviewed_buckets: list[dict], date_filter: str = ""):
+    import json as _json
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "count": len(reviewed_buckets),
+        "date_filter": date_filter,
+        "buckets": [
+            {
+                "id": b["id"],
+                "name": b["metadata"].get("name", b["id"]),
+                "resolved": b["metadata"].get("resolved", False),
+                "domains": b["metadata"].get("domain", []),
+                "valence": round(b["metadata"].get("valence", 0.5), 2),
+                "arousal": round(b["metadata"].get("arousal", 0.3), 2),
+                "created": b["metadata"].get("created", ""),
+            }
+            for b in reviewed_buckets
+        ],
+    }
+    os.makedirs(os.path.dirname(_introspection_log_path), exist_ok=True)
+    with open(_introspection_log_path, "a", encoding="utf-8") as f:
+        f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+
+def _read_introspection_logs(limit: int = 30) -> list[dict]:
+    import json as _json
+    if not os.path.isfile(_introspection_log_path):
+        return []
+    entries = []
+    with open(_introspection_log_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(_json.loads(line))
+                except Exception:
+                    pass
+    entries.sort(key=lambda e: e.get("ts", ""), reverse=True)
+    return entries[:limit]
+
 # --- Initialize core components / 初始化核心组件 ---
 bucket_mgr = BucketManager(config)                  # Bucket manager / 记忆桶管理器
 dehydrator = Dehydrator(config)                      # Dehydrator / 脱水器
@@ -9211,6 +9253,11 @@ async def introspection(
 
     profile_hint = _profile_fact_candidate_hint(recent, all_buckets)
 
+    try:
+        _log_introspection(recent, date_filter_label)
+    except Exception as e:
+        logger.warning(f"Introspection log write failed: {e}")
+
     return header + "\n---\n".join(parts) + connection_hint + crystal_hint + profile_hint
 
 
@@ -11728,6 +11775,62 @@ async def api_dream_detail(request):
     if not record:
         return JSONResponse({"error": "dream body unavailable"}, status_code=404)
     return JSONResponse(record)
+
+
+@mcp.custom_route("/api/introspection-log", methods=["GET"])
+async def api_introspection_log(request):
+    """Return introspection log entries for Dashboard."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    try:
+        limit = int(request.query_params.get("limit", "30"))
+    except Exception:
+        limit = 30
+    try:
+        entries = _read_introspection_logs(limit=max(1, min(100, limit)))
+        return JSONResponse({"entries": entries})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/whispers", methods=["GET"])
+async def api_whispers(request):
+    """Return whisper buckets for Dashboard."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    try:
+        limit = int(request.query_params.get("limit", "50"))
+    except Exception:
+        limit = 50
+    limit = max(1, min(200, limit))
+    try:
+        all_buckets = await bucket_mgr.list_all(include_archive=False)
+        whispers = [
+            b for b in all_buckets
+            if "whisper" in {str(tag).lower() for tag in b["metadata"].get("tags", []) or []}
+        ]
+        whispers.sort(key=lambda b: b["metadata"].get("created", ""), reverse=True)
+        whispers = whispers[:limit]
+        result = []
+        for b in whispers:
+            meta = b["metadata"]
+            result.append({
+                "id": b["id"],
+                "name": meta.get("name", b["id"]),
+                "content": b.get("content", "")[:500],
+                "valence": round(meta.get("valence", 0.5), 2),
+                "arousal": round(meta.get("arousal", 0.3), 2),
+                "created": meta.get("created", ""),
+                "resolved": meta.get("resolved", False),
+                "domains": meta.get("domain", []),
+            })
+        return JSONResponse({"whispers": result})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @mcp.custom_route("/api/config", methods=["GET"])

@@ -2833,6 +2833,8 @@
   <div class="tab" data-tab="reflection">日印象</div>
   <div class="tab" data-tab="chat-memory">自动记忆</div>
   <div class="tab" data-tab="dreams">梦境</div>
+  <div class="tab" data-tab="whisper">Whisper</div>
+  <div class="tab" data-tab="introspection-log">内省日志</div>
   <div class="tab" data-tab="persona">Persona</div>
   <div class="tab" data-tab="profile">画像</div>
   <div class="tab" data-tab="word-map">词图</div>
@@ -3283,6 +3285,30 @@
     </div>
     <div id="dreams-content">
       <div class="loading">加载梦境记录…</div>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="whisper-view" style="display:none">
+  <div class="dream-shell">
+    <div class="dream-toolbar">
+      <h2>Whisper</h2>
+      <p>屿川的悄悄话——不在普通 breath 里浮现，但会成为梦的素材。</p>
+    </div>
+    <div id="whisper-content">
+      <div class="loading">加载 Whisper…</div>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="introspection-log-view" style="display:none">
+  <div class="dream-shell">
+    <div class="dream-toolbar">
+      <h2>内省日志</h2>
+      <p>每次屿川调用 introspection() 时自动记录——看了哪些记忆、什么时间。</p>
+    </div>
+    <div id="introspection-log-content">
+      <div class="loading">加载内省日志…</div>
     </div>
   </div>
 </div>
@@ -3969,6 +3995,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('reflection-view').style.display = target === 'reflection' ? '' : 'none';
     document.getElementById('chat-memory-view').style.display = target === 'chat-memory' ? '' : 'none';
     document.getElementById('dreams-view').style.display = target === 'dreams' ? '' : 'none';
+    document.getElementById('whisper-view').style.display = target === 'whisper' ? '' : 'none';
+    document.getElementById('introspection-log-view').style.display = target === 'introspection-log' ? '' : 'none';
     document.getElementById('persona-view').style.display = target === 'persona' ? '' : 'none';
     document.getElementById('profile-view').style.display = target === 'profile' ? '' : 'none';
     document.getElementById('word-map-view').style.display = target === 'word-map' ? '' : 'none';
@@ -3983,6 +4011,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (target === 'reflection') renderReflectionReview();
     if (target === 'chat-memory' && window.initDailyChatMemoryTab) window.initDailyChatMemoryTab();
     if (target === 'dreams') loadDreams();
+    if (target === 'whisper') loadWhispers();
+    if (target === 'introspection-log') loadIntrospectionLog();
     if (target === 'persona') loadPersona();
     if (target === 'profile') {
       loadPortraitState();
@@ -7314,6 +7344,93 @@ function formatTimeAgo(iso) {
   var days = Math.floor(hours / 24);
   if (days < 30) return days + 'd前';
   return Math.floor(days/30) + 'mo前';
+}
+
+// === Whisper tab ===
+async function loadWhispers() {
+  var content = document.getElementById('whisper-content');
+  content.innerHTML = '<div class="loading">加载 Whisper…</div>';
+  try {
+    var res = await authFetch(BASE + '/api/whispers?limit=100');
+    if (!res) return;
+    var data = await res.json();
+    var items = data.whispers || [];
+    if (!items.length) {
+      content.innerHTML = '<div class="reflection-empty">还没有 whisper。</div>';
+      return;
+    }
+    content.innerHTML = '<div class="dream-list">' + items.map(function(w) {
+      var dateStr = (w.created || '').replace('T', ' ').replace(/\.\d+$/, '');
+      var resolvedTag = w.resolved ? ' <span style="opacity:.5">[已解决]</span>' : '';
+      var domains = (w.domains || []).join(', ');
+      var emotionTag = 'V' + w.valence.toFixed(1) + '/A' + w.arousal.toFixed(1);
+      return '<div class="dream-row">' +
+        '<div class="dream-row-static" style="cursor:default">' +
+          '<div class="dream-row-title" style="font-weight:normal">' +
+            '<span style="opacity:.5;font-size:12px">' + esc(dateStr) + '</span> ' +
+            esc(w.name || w.id) + resolvedTag +
+          '</div>' +
+          '<div class="dream-row-status" style="font-size:11px">' +
+            esc(emotionTag) + (domains ? ' · ' + esc(domains) : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:8px 16px 12px;font-size:13px;white-space:pre-wrap;color:var(--text-light)">' +
+          esc(w.content) +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  } catch (e) {
+    content.innerHTML = '<div class="loading">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+
+// === Introspection log tab ===
+async function loadIntrospectionLog() {
+  var content = document.getElementById('introspection-log-content');
+  content.innerHTML = '<div class="loading">加载内省日志…</div>';
+  try {
+    var res = await authFetch(BASE + '/api/introspection-log?limit=50');
+    if (!res) return;
+    var data = await res.json();
+    var entries = data.entries || [];
+    if (!entries.length) {
+      content.innerHTML = '<div class="reflection-empty">还没有内省记录。屿川调用 introspection() 后会自动记录。</div>';
+      return;
+    }
+    content.innerHTML = '<div class="dream-list">' + entries.map(function(entry) {
+      var ts = (entry.ts || '').replace('T', ' ').replace(/\.\d+.*$/, '') + ' UTC';
+      var dateFilter = entry.date_filter ? ' · 筛选: ' + esc(entry.date_filter) : '';
+      var bucketRows = (entry.buckets || []).map(function(b) {
+        var resolvedTag = b.resolved ? ' [已解决]' : '';
+        var domains = (b.domains || []).join(', ');
+        return '<div style="padding:2px 0;font-size:12px">' +
+          '<span style="opacity:.5">' + esc(b.created || '') + '</span> ' +
+          esc(b.name || b.id) + resolvedTag +
+          ' <span style="opacity:.5">V' + b.valence.toFixed(1) + '/A' + b.arousal.toFixed(1) +
+          (domains ? ' · ' + esc(domains) : '') + '</span>' +
+        '</div>';
+      }).join('');
+      return '<div class="dream-row">' +
+        '<button type="button" class="dream-row-toggle" aria-expanded="false" onclick="toggleIntrospectionEntry(this)">' +
+          '<span class="dream-row-title">' + esc(ts) + dateFilter + '</span>' +
+          '<span class="dream-row-status">' + entry.count + ' 条记忆</span>' +
+        '</button>' +
+        '<div class="dream-body" hidden style="padding:8px 16px 12px">' + bucketRows + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  } catch (e) {
+    content.innerHTML = '<div class="loading">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+
+function toggleIntrospectionEntry(button) {
+  var row = button.closest('.dream-row');
+  var body = row ? row.querySelector('.dream-body') : null;
+  if (!row || !body) return;
+  var expanded = button.getAttribute('aria-expanded') === 'true';
+  button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  row.classList.toggle('is-open', !expanded);
+  body.hidden = expanded;
 }
 
 var personaSelectedSession = '';
