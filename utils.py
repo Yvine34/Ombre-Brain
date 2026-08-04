@@ -675,6 +675,20 @@ def load_config(config_path: str = None) -> dict:
             if item.strip()
         ]
 
+    env_ai_name = os.environ.get("OMBRE_AI_NAME", "")
+    if env_ai_name:
+        config.setdefault("identity", {})["ai_name"] = env_ai_name
+
+    env_user_name = os.environ.get("OMBRE_USER_NAME", "")
+    if env_user_name:
+        config.setdefault("identity", {})["user_name"] = env_user_name
+        if not os.environ.get("OMBRE_USER_DISPLAY_NAME", ""):
+            config["identity"]["user_display_name"] = env_user_name
+
+    env_user_display_name = os.environ.get("OMBRE_USER_DISPLAY_NAME", "")
+    if env_user_display_name:
+        config.setdefault("identity", {})["user_display_name"] = env_user_display_name
+
     env_domain_sentinel_model = os.environ.get("OMBRE_DOMAIN_SENTINEL_MODEL", "")
     if env_domain_sentinel_model:
         config.setdefault("gateway", {})["domain_sentinel_model"] = env_domain_sentinel_model
