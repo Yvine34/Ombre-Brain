@@ -4,14 +4,8 @@
 # gateway.py: OpenAI-compatible Gateway (port 8010)
 
 python server.py &
-SERVER_PID=$!
-
 python gateway.py &
-GATEWAY_PID=$!
 
-# If either process exits, stop the other and exit
-trap "kill $SERVER_PID $GATEWAY_PID 2>/dev/null; exit" INT TERM
+trap "kill $(jobs -p) 2>/dev/null; exit" INT TERM
 
-wait -n
-kill $SERVER_PID $GATEWAY_PID 2>/dev/null
-exit 1
+wait
