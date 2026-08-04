@@ -1,7 +1,8 @@
-"""Read-only normalized metadata view for memory buckets."""
+"""Normalized metadata view for memory buckets with runtime custom domains."""
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any
@@ -109,6 +110,62 @@ DOMAIN_PROMPT_CHOICES = [
     ("project", "我们的项目、工作、学业、个人项目、创作、求职、论文"),
     ("general", "不确定或不属于前面几类"),
 ]
+
+_BUILTIN_DOMAIN_KEYS = set(DOMAIN_LABELS)
+_custom_domains: dict[str, dict] = {}
+_custom_domains_path: str = ""
+
+
+def init_custom_domains(state_dir: str) -> None:
+    global _custom_domains_path
+    os.makedirs(state_dir, exist_ok=True)
+    _custom_domains_path = os.path.join(state_dir, "custom_domains.json")
+    if os.path.isfile(_custom_domains_path):
+        with open(_custom_domains_path, "r", encoding="utf-8") as f:
+            for entry in json.load(f):
+                _register_custom_domain(entry["key"], entry["label"], entry.get("description", ""))
+
+
+def _register_custom_domain(key: str, label: str, description: str = "") -> None:
+    _custom_domains[key] = {"key": key, "label": label, "description": description}
+    DOMAIN_LABELS[key] = label
+    DOMAIN_PARENT_LABELS[key] = label
+    CANONICAL_DOMAINS.add(key)
+    existing_keys = {k for k, _ in DOMAIN_PROMPT_CHOICES}
+    if key not in existing_keys and description:
+        DOMAIN_PROMPT_CHOICES.append((key, description))
+
+
+def add_custom_domain(key: str, label: str, description: str = "") -> str:
+    if key in _BUILTIN_DOMAIN_KEYS:
+        return f"'{key}' 是内置域，不能覆盖"
+    _register_custom_domain(key, label, description)
+    _save_custom_domains()
+    return f"新增域：{key}（{label}）"
+
+
+def remove_custom_domain(key: str) -> str:
+    if key not in _custom_domains:
+        return f"'{key}' 不是自定义域"
+    del _custom_domains[key]
+    DOMAIN_LABELS.pop(key, None)
+    DOMAIN_PARENT_LABELS.pop(key, None)
+    CANONICAL_DOMAINS.discard(key)
+    DOMAIN_PROMPT_CHOICES[:] = [(k, d) for k, d in DOMAIN_PROMPT_CHOICES if k != key]
+    _save_custom_domains()
+    return f"已移除域：{key}"
+
+
+def list_custom_domains() -> list[dict]:
+    return list(_custom_domains.values())
+
+
+def _save_custom_domains() -> None:
+    if not _custom_domains_path:
+        return
+    with open(_custom_domains_path, "w", encoding="utf-8") as f:
+        json.dump(list(_custom_domains.values()), f, ensure_ascii=False, indent=2)
+
 
 DOMAIN_ALIASES = {
     "relationship": {

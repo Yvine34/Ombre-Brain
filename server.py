@@ -114,7 +114,7 @@ from memory_layers import (
     moment_runtime_gate_debug,
     normalize_write_classification,
 )
-from memory_metadata import domain_options, normalize_domain_key, normalize_memory_metadata
+from memory_metadata import domain_options, normalize_domain_key, normalize_memory_metadata, init_custom_domains, add_custom_domain, remove_custom_domain, list_custom_domains
 from recall_policy import RecallPolicy, diffusion_seed_topic_term_has_specific_residue
 from memory_write_gate import MemoryWriteGate, WriteGateDecision
 from memory_nodes import MemoryNodeStore
@@ -159,6 +159,12 @@ def _coerce_memory_id(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+# --- Load custom domains / 加载自定义域 ---
+_state_dir = config.get("state_dir") or os.path.join(
+    os.path.dirname(os.path.abspath(config.get("buckets_dir", "buckets"))), "state"
+)
+init_custom_domains(_state_dir)
 
 # --- Initialize core components / 初始化核心组件 ---
 bucket_mgr = BucketManager(config)                  # Bucket manager / 记忆桶管理器
@@ -9019,6 +9025,39 @@ async def pulse(include_archive: bool = False) -> str:
         )
 
     return status + "\n=== 记忆列表 ===\n" + "\n".join(lines)
+
+
+# =============================================================
+# manage_domain — AI 自主管理记忆域分类
+# =============================================================
+@mcp.tool()
+async def manage_domain(
+    action: str,
+    key: str = "",
+    label: str = "",
+    description: str = "",
+) -> str:
+    """管理自定义记忆域分类。
+
+    action:
+      - "add": 新增域，需要 key（英文键）和 label（中文名），可选 description（用途描述）
+      - "remove": 移除自定义域，需要 key
+      - "list": 列出所有自定义域
+    """
+    if action == "add":
+        if not key or not label:
+            return "需要 key（英文键）和 label（中文名）"
+        return add_custom_domain(key, label, description)
+    elif action == "remove":
+        if not key:
+            return "需要 key"
+        return remove_custom_domain(key)
+    elif action == "list":
+        customs = list_custom_domains()
+        if not customs:
+            return "没有自定义域，只有内置域"
+        return "\n".join(f"  {d['key']}: {d['label']}" + (f" — {d['description']}" if d.get('description') else "") for d in customs)
+    return f"未知 action: {action}，支持 add/remove/list"
 
 
 # =============================================================
