@@ -33,7 +33,13 @@ VOLUME ["/app/buckets"]
 # 容器场景默认用 streamable-http
 ENV OMBRE_TRANSPORT=streamable-http
 ENV OMBRE_BUCKETS_DIR=/app/buckets
+ENV OMBRE_STATE_DIR=/app/state
 
-EXPOSE 8000
+# server.py: 8000 (MCP + Dashboard)
+# gateway.py: 8010 (OpenAI-compatible Gateway)
+EXPOSE 8000 8010
 
-CMD ["python", "server.py"]
+COPY start.sh .
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
