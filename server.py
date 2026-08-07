@@ -3155,9 +3155,22 @@ async def _refresh_bucket_embedding_async(bucket_id: str) -> None:
 # 供 Cloudflare Tunnel 或反代定期 ping，防止空闲超时断连
 # =============================================================
 @mcp.custom_route("/", methods=["GET"])
-async def root_redirect(request):
-    from starlette.responses import RedirectResponse
-    return RedirectResponse(url="/dashboard")
+async def root_nous(request):
+    """Serve Nous frontend (index.html)."""
+    from starlette.responses import HTMLResponse, FileResponse
+    import os
+    nous_path = os.path.join(os.path.dirname(__file__), "public", "index.html")
+    try:
+        with open(nous_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    except FileNotFoundError:
+        # Fallback to dashboard if Nous not available
+        dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+        try:
+            with open(dashboard_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(f.read())
+        except FileNotFoundError:
+            return HTMLResponse("<h1>Index not found</h1>", status_code=404)
 
 
 @mcp.custom_route("/auth/status", methods=["GET"])
@@ -11715,6 +11728,44 @@ async def dashboard_assets(request):
     if not target.startswith(base_dir + os.sep) or not os.path.isfile(target):
         return PlainTextResponse("dashboard asset not found", status_code=404)
     return FileResponse(target)
+
+
+@mcp.custom_route("/{path:path}", methods=["GET"])
+async def serve_nous_static(request):
+    """Serve Nous frontend static files (_next, etc.)."""
+    from starlette.responses import FileResponse, PlainTextResponse
+    import os
+
+    path = str(request.path_params.get("path") or "").strip().replace("\\", "/")
+
+    # Skip API routes and known server paths
+    if path.startswith("api/") or path.startswith("auth/") or path.startswith("mcp/"):
+        return PlainTextResponse("Not found", status_code=404)
+
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "public"))
+    target = os.path.abspath(os.path.join(base_dir, path))
+
+    # Security check: prevent directory traversal
+    if not target.startswith(base_dir + os.sep):
+        return PlainTextResponse("Not found", status_code=404)
+
+    # If it's a directory, try index.html
+    if os.path.isdir(target):
+        index_file = os.path.join(target, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        return PlainTextResponse("Not found", status_code=404)
+
+    # If it's a file, serve it
+    if os.path.isfile(target):
+        return FileResponse(target)
+
+    # Try with .html extension (for Nous routes)
+    html_target = target + ".html"
+    if os.path.isfile(html_target):
+        return FileResponse(html_target)
+
+    return PlainTextResponse("Not found", status_code=404)
 
 
 @mcp.custom_route("/api/persona", methods=["GET"])
