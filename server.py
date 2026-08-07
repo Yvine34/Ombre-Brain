@@ -13927,13 +13927,27 @@ if __name__ == "__main__":
         )
         logger.info("CORS middleware enabled for remote transport / 已启用 CORS 中间件")
 
-        # Mount Nous static files after all API routes are registered
-        from starlette.staticfiles import StaticFiles
+        # Handle 404 with static file serving for Nous frontend (SPA routing)
         import os
-        public_dir = os.path.join(os.path.dirname(__file__), "public")
-        if os.path.isdir(public_dir):
-            _app.mount("/", StaticFiles(directory=public_dir, html=True), name="static")
-            logger.info("Nous static files mounted from public/")
+        from starlette.responses import FileResponse
+
+        async def not_found(request, exc):
+            public_dir = os.path.join(os.path.dirname(__file__), "public")
+            file_path = os.path.join(public_dir, request.url.path.lstrip("/"))
+            # Try to serve the file
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+            # Fall back to index.html for SPA routing
+            index_path = os.path.join(public_dir, "index.html")
+            if os.path.isfile(index_path):
+                return FileResponse(index_path)
+            # If nothing, return 404
+            from starlette.responses import PlainTextResponse
+            return PlainTextResponse("Not Found", status_code=404)
+
+        from starlette.exceptions import HTTPException
+        _app.add_exception_handler(404, not_found)
+        logger.info("404 handler added for Nous static files")
 
         if OMBRE_CHATGPT_OAUTH.enabled:
             logger.info(
