@@ -11833,6 +11833,143 @@ async def api_whispers(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@mcp.custom_route("/api/ombre/auth/login", methods=["POST"])
+async def api_ombre_login(request):
+    """Login endpoint for Nous frontend."""
+    from starlette.responses import JSONResponse
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    password = str(body.get("password", "")).strip()
+    if _verify_dashboard_password(password):
+        return _dashboard_login_response()
+    return JSONResponse({"error": "password rejected"}, status_code=401)
+
+
+@mcp.custom_route("/api/ombre/list-buckets", methods=["GET"])
+async def api_ombre_list_buckets(request):
+    """List all buckets for Nous frontend."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    try:
+        all_buckets = await bucket_mgr.list_all(include_archive=False)
+        result = []
+        for b in all_buckets:
+            meta = b.get("metadata", {})
+            result.append({
+                "id": b["id"],
+                "name": meta.get("name", b["id"]),
+                "domain": meta.get("domain", []),
+                "tags": meta.get("tags", []),
+                "created": meta.get("created", ""),
+                "valence": meta.get("valence", 0.5),
+                "arousal": meta.get("arousal", 0.3),
+                "resolved": meta.get("resolved", False),
+            })
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/ombre/read-bucket/{bucket_id}", methods=["GET"])
+async def api_ombre_read_bucket(request):
+    """Read single bucket content for Nous frontend."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    bucket_id = request.path_params.get("bucket_id", "").strip()
+    if not bucket_id:
+        return JSONResponse({"error": "bucket_id required"}, status_code=400)
+    try:
+        bucket = await bucket_mgr.get(bucket_id)
+        if not bucket:
+            return JSONResponse({"error": "bucket not found"}, status_code=404)
+        return JSONResponse({
+            "id": bucket_id,
+            "content": bucket.get("content", ""),
+            "metadata": bucket.get("metadata", {}),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/ombre/hold", methods=["POST"])
+async def api_ombre_hold(request):
+    """Create memory via REST (wraps hold() MCP tool)."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    content = str(body.get("content", "")).strip()
+    if not content:
+        return JSONResponse({"error": "content required"}, status_code=400)
+
+    try:
+        await decay_engine.ensure_started()
+        tags = body.get("tags", "")
+        domain = body.get("domain", "")
+        whisper = body.get("whisper", False)
+        valence = body.get("valence", -1)
+        arousal = body.get("arousal", -1)
+
+        # Use hold tool
+        hold_result = await hold(
+            content=content,
+            tags=tags,
+            domain=domain,
+            whisper=whisper,
+            valence=valence,
+            arousal=arousal,
+        )
+        return JSONResponse({"result": hold_result})
+    except Exception as e:
+        logger.error(f"hold error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/ombre/trace", methods=["POST"])
+async def api_ombre_trace(request):
+    """Update/delete memory via REST (wraps trace() MCP tool)."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    bucket_id = str(body.get("bucket_id", "")).strip()
+    if not bucket_id:
+        return JSONResponse({"error": "bucket_id required"}, status_code=400)
+
+    try:
+        await decay_engine.ensure_started()
+        resolved = body.get("resolved", -1)
+        delete = body.get("delete", False)
+
+        # Use trace tool
+        trace_result = await trace(
+            bucket_id=bucket_id,
+            resolved=resolved if resolved != -1 else "",
+            delete=delete,
+        )
+        return JSONResponse({"result": trace_result})
+    except Exception as e:
+        logger.error(f"trace error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @mcp.custom_route("/api/config", methods=["GET"])
 async def api_config_get(request):
     """Get current runtime config (safe fields only, API key masked)."""
