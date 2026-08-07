@@ -13622,6 +13622,54 @@ async def api_import_review(request):
     return JSONResponse({"applied": applied, "errors": errors})
 
 
+# --- Nous Frontend Static File Serving / 从 public/ 目录提供 Nous 静态文件 ---
+@mcp.custom_route("/{path:path}", methods=["GET"])
+async def serve_nous_static(request):
+    """
+    Serve Nous static files from public/ directory.
+    Falls back to index.html for SPA routing so Nous can handle dynamic routes.
+    This route must come AFTER all API routes so they take precedence.
+    """
+    from starlette.responses import FileResponse
+    import os
+
+    path = request.path_params.get("path", "")
+
+    # Remove leading slash if present
+    if path.startswith("/"):
+        path = path[1:]
+
+    public_dir = os.path.join(os.path.dirname(__file__), "public")
+    file_path = os.path.join(public_dir, path)
+
+    # Security: ensure the resolved path is within public/
+    try:
+        file_path = os.path.abspath(file_path)
+        public_dir = os.path.abspath(public_dir)
+        if not file_path.startswith(public_dir):
+            return FileResponse(os.path.join(public_dir, "404.html"), status_code=404)
+    except Exception:
+        return FileResponse(os.path.join(public_dir, "404.html"), status_code=404)
+
+    # Try to serve the requested file
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+
+    # If it's a directory or file doesn't exist, try index.html (for SPA routing)
+    index_path = os.path.join(public_dir, "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
+
+    # Fallback to 404.html if it exists
+    not_found_path = os.path.join(public_dir, "404.html")
+    if os.path.isfile(not_found_path):
+        return FileResponse(not_found_path, status_code=404)
+
+    # If nothing exists, return a simple 404
+    from starlette.responses import PlainTextResponse
+    return PlainTextResponse("Not Found", status_code=404)
+
+
 # --- Entry point / 启动入口 ---
 if __name__ == "__main__":
     transport = config.get("transport", "stdio")
