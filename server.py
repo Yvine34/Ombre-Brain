@@ -13623,57 +13623,7 @@ async def api_import_review(request):
 
 
 # --- Nous Frontend Static File Serving / 从 public/ 目录提供 Nous 静态文件 ---
-@mcp.custom_route("/{path:path}", methods=["GET"])
-async def serve_nous_static_files(request):
-    """
-    Serve Nous static files from public/ directory.
-    Explicitly excludes API routes to prevent interference.
-    Falls back to index.html for SPA routing.
-    """
-    from starlette.responses import FileResponse, PlainTextResponse
-    import os
-
-    path = request.path_params.get("path", "") or ""
-
-    # Explicitly exclude protected paths - let their handlers deal with them
-    protected_prefixes = ["/api/", "/mcp/", "/oauth/", "/.well-known/", "/dashboard"]
-    if any(("/" + path).startswith(prefix) for prefix in protected_prefixes):
-        # Don't handle API/system routes - return 404 to let proper handlers take over
-        return PlainTextResponse("Not Found", status_code=404)
-
-    # Remove leading slash if present
-    if path.startswith("/"):
-        path = path[1:]
-
-    public_dir = os.path.join(os.path.dirname(__file__), "public")
-    file_path = os.path.join(public_dir, path)
-
-    # Security: ensure the resolved path is within public/
-    try:
-        file_path = os.path.abspath(file_path)
-        public_dir_abs = os.path.abspath(public_dir)
-        if not file_path.startswith(public_dir_abs):
-            return PlainTextResponse("Forbidden", status_code=403)
-    except Exception:
-        return PlainTextResponse("Forbidden", status_code=403)
-
-    # Try to serve the requested file
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-
-    # If it's a directory or file doesn't exist, try index.html (for SPA routing)
-    if os.path.isdir(file_path):
-        index_path = os.path.join(file_path, "index.html")
-        if os.path.isfile(index_path):
-            return FileResponse(index_path)
-
-    # Fallback to index.html for SPA routing
-    index_path = os.path.join(public_dir, "index.html")
-    if os.path.isfile(index_path):
-        return FileResponse(index_path)
-
-    # If nothing exists, return 404
-    return PlainTextResponse("Not Found", status_code=404)
+# StaticFiles will be mounted in main app setup after all API routes are registered
 
 
 # --- Entry point / 启动入口 ---
@@ -13976,6 +13926,15 @@ if __name__ == "__main__":
             protected_hosts=OMBRE_CHATGPT_OAUTH_PROTECTED_HOSTS,
         )
         logger.info("CORS middleware enabled for remote transport / 已启用 CORS 中间件")
+
+        # Mount Nous static files after all API routes are registered
+        from starlette.staticfiles import StaticFiles
+        import os
+        public_dir = os.path.join(os.path.dirname(__file__), "public")
+        if os.path.isdir(public_dir):
+            _app.mount("/", StaticFiles(directory=public_dir, html=True), name="static")
+            logger.info("Nous static files mounted from public/")
+
         if OMBRE_CHATGPT_OAUTH.enabled:
             logger.info(
                 "ChatGPT OAuth enabled for Ombre MCP / 已启用 ChatGPT OAuth: protected_hosts=%s",
