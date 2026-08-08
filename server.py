@@ -13958,6 +13958,190 @@ async def api_cal_post(request):
     return JSONResponse({"ok": True, **data})
 
 
+# --- Dwell Chat API ---
+
+_chat_msgs: list = []
+_chat_seq_ctr: int = 0
+_chat_events: list = []
+_chat_event_ctr: int = 0
+_chat_busy: bool = False
+_chat_stop: bool = False
+_chat_waiters: set = set()
+
+
+def _chat_next_seq() -> int:
+    global _chat_seq_ctr
+    _chat_seq_ctr += 1
+    return _chat_seq_ctr
+
+
+def _chat_push_event(**kw) -> dict:
+    global _chat_event_ctr
+    _chat_event_ctr += 1
+    ev = {"seq": _chat_event_ctr, **kw}
+    _chat_events.append(ev)
+    if len(_chat_events) > 2000:
+        _chat_events[:] = _chat_events[-2000:]
+    for w in list(_chat_waiters):
+        w.set()
+    return ev
+
+
+@mcp.custom_route("/api/status", methods=["GET"])
+async def api_chat_status(request):
+    from starlette.responses import JSONResponse
+    return JSONResponse({"busy": _chat_busy})
+
+
+@mcp.custom_route("/api/messages", methods=["GET"])
+async def api_chat_messages(request):
+    from starlette.responses import JSONResponse
+    limit = min(int(request.query_params.get("limit", "100")), 500)
+    before_raw = request.query_params.get("before")
+    if before_raw is not None:
+        before = int(before_raw)
+        msgs = [m for m in _chat_msgs if m["seq"] < before]
+    else:
+        msgs = list(_chat_msgs)
+    total = len(msgs)
+    if total > limit:
+        msgs = msgs[-limit:]
+        more = True
+    else:
+        more = False
+    upto = msgs[-1]["seq"] if msgs else _chat_event_ctr
+    return JSONResponse({"msgs": msgs, "more": more, "upto": upto})
+
+
+@mcp.custom_route("/api/poll", methods=["GET"])
+async def api_chat_poll(request):
+    from starlette.responses import JSONResponse
+    since = int(request.query_params.get("since", "0"))
+    events = [e for e in _chat_events if e["seq"] > since]
+    if not events:
+        ev = asyncio.Event()
+        _chat_waiters.add(ev)
+        try:
+            await asyncio.wait_for(ev.wait(), 25.0)
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            _chat_waiters.discard(ev)
+        events = [e for e in _chat_events if e["seq"] > since]
+    next_cursor = events[-1]["seq"] if events else since
+    return JSONResponse({"next": next_cursor, "events": events, "ver": "1"})
+
+
+@mcp.custom_route("/api/newchat", methods=["POST"])
+async def api_newchat(request):
+    from starlette.responses import JSONResponse
+    global _chat_msgs, _chat_stop
+    _chat_stop = True
+    _chat_msgs = []
+    _chat_push_event(type="system", subtype="newchat", text="新的对话开始了")
+    return JSONResponse({"ok": True})
+
+
+@mcp.custom_route("/api/stop", methods=["POST"])
+async def api_chat_stop(request):
+    from starlette.responses import JSONResponse
+    global _chat_stop
+    _chat_stop = True
+    return JSONResponse({"ok": True})
+
+
+@mcp.custom_route("/api/send", methods=["POST"])
+async def api_chat_send(request):
+    from starlette.responses import JSONResponse
+    global _chat_busy
+    if _chat_busy:
+        return JSONResponse({"error": "busy"}, status_code=409)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    text = str(body.get("text", "")).strip()
+    if not text:
+        return JSONResponse({"error": "no text"}, status_code=400)
+
+    seq = _chat_next_seq()
+    _chat_msgs.append({"seq": seq, "kind": "me", "text": text, "extra": "", "at": seq})
+    _chat_push_event(type="echo", text=text)
+
+    asyncio.ensure_future(_chat_respond())
+    return JSONResponse({"ok": True})
+
+
+async def _chat_respond():
+    global _chat_busy, _chat_stop
+    _chat_busy = True
+    _chat_stop = False
+
+    api_key = os.environ.get("OMBRE_API_KEY", "")
+    if not api_key:
+        seq = _chat_next_seq()
+        _chat_msgs.append({"seq": seq, "kind": "gu", "text": "（没有配置 API Key，无法对话）", "extra": "", "at": seq})
+        _chat_push_event(type="result", error=True)
+        _chat_busy = False
+        return
+
+    ai_name = _ai_author_name() or "他"
+    system_prompt = f"你是{ai_name}，一个温柔的陪伴者。请用中文自然地回复，简洁真诚。"
+
+    messages = []
+    for m in _chat_msgs:
+        if m["kind"] == "me":
+            messages.append({"role": "user", "content": m["text"]})
+        elif m["kind"] == "gu":
+            messages.append({"role": "assistant", "content": m["text"]})
+
+    accumulated_text = ""
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+            async with client.stream(
+                "POST",
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": os.environ.get("OMBRE_CHAT_MODEL", "claude-haiku-4-5-20251001"),
+                    "max_tokens": 1024,
+                    "system": system_prompt,
+                    "messages": messages,
+                    "stream": True,
+                },
+            ) as resp:
+                async for line in resp.aiter_lines():
+                    if _chat_stop:
+                        break
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+                    try:
+                        ev = _json.loads(data_str)
+                    except Exception:
+                        continue
+                    if ev.get("type") == "content_block_delta":
+                        delta = ev.get("delta", {})
+                        if delta.get("type") == "text_delta":
+                            chunk = delta.get("text", "")
+                            accumulated_text += chunk
+                            _chat_push_event(type="stream_event", event={"delta": {"type": "text_delta", "text": chunk}})
+    except Exception as e:
+        logger.warning("Chat API error: %s", e)
+    finally:
+        _chat_busy = False
+        if accumulated_text:
+            seq = _chat_next_seq()
+            _chat_msgs.append({"seq": seq, "kind": "gu", "text": accumulated_text, "extra": "", "at": seq})
+        _chat_push_event(type="result")
+
+
 # --- Static File Serving (dwell frontend from public/) ---
 # StaticFiles will be mounted in main app setup after all API routes are registered
 
