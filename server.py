@@ -13626,11 +13626,8 @@ async def api_import_review(request):
 
 @mcp.custom_route("/api/authmode", methods=["GET"])
 async def api_authmode(request):
-    """Auth mode check for dwell frontend — 401 if not logged in."""
+    """Auth mode info for dwell frontend."""
     from starlette.responses import JSONResponse
-    err = _require_dashboard_auth(request)
-    if err:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
     return JSONResponse({"mode": "session", "base": ""})
 
 
