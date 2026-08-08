@@ -13622,7 +13622,343 @@ async def api_import_review(request):
     return JSONResponse({"applied": applied, "errors": errors})
 
 
-# --- Nous Frontend Static File Serving / 从 public/ 目录提供 Nous 静态文件 ---
+# --- Dwell Frontend API Routes ---
+
+@mcp.custom_route("/api/authmode", methods=["GET"])
+async def api_authmode(request):
+    """Auth mode check for dwell frontend — 401 if not logged in."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return JSONResponse({"mode": "session", "base": ""})
+
+
+@mcp.custom_route("/api/whisper", methods=["GET"])
+async def api_whisper_get(request):
+    """Get whispers for dwell frontend."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"items": []}, status_code=200)
+    try:
+        all_buckets = await bucket_mgr.list_all(include_archive=False)
+        items = []
+        for b in all_buckets:
+            meta = b.get("metadata", {})
+            tags = meta.get("tags", [])
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(",")]
+            if "whisper" in tags:
+                items.append({
+                    "id": b["id"],
+                    "who": "her",
+                    "text": b.get("content", ""),
+                    "at": int(meta.get("created_ts", 0) or 0),
+                })
+        items.sort(key=lambda x: x["at"])
+        return JSONResponse({"items": items})
+    except Exception as e:
+        return JSONResponse({"items": [], "error": str(e)})
+
+
+@mcp.custom_route("/api/whisper", methods=["POST"])
+async def api_whisper_post(request):
+    """Add a whisper from the user (dwell frontend)."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    text = str(body.get("text", "")).strip()
+    if not text:
+        return JSONResponse({"error": "empty"}, status_code=400)
+    result = await bucket_mgr.create(
+        content=text,
+        tags=["whisper"],
+        importance=5,
+    )
+    return JSONResponse({"ok": True, "id": result.get("id", "")})
+
+
+@mcp.custom_route("/api/todos", methods=["GET"])
+async def api_todos_get(request):
+    """Get todos for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"ok": True, "mine": [], "hers": []})
+    try:
+        todo_path = os.path.join(os.path.dirname(__file__), ".home-todos.json")
+        if os.path.isfile(todo_path):
+            with open(todo_path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+        else:
+            data = {"mine": [], "hers": []}
+        return JSONResponse({"ok": True, **data})
+    except Exception as e:
+        return JSONResponse({"ok": False, "mine": [], "hers": [], "error": str(e)})
+
+
+@mcp.custom_route("/api/todos", methods=["POST"])
+async def api_todos_post(request):
+    """Modify todos for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    todo_path = os.path.join(os.path.dirname(__file__), ".home-todos.json")
+    if os.path.isfile(todo_path):
+        with open(todo_path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+    else:
+        data = {"mine": [], "hers": []}
+
+    action = body.get("action", "")
+    side = body.get("side", "mine")
+    if side not in ("mine", "hers"):
+        return JSONResponse({"error": "invalid side"}, status_code=400)
+
+    if action == "add":
+        import secrets as _secrets
+        data[side].append({
+            "id": _secrets.token_hex(6),
+            "text": str(body.get("text", "")).strip(),
+            "done": False,
+            "at": str(body.get("at", "")),
+            "made": int(time.time()),
+        })
+    elif action == "toggle":
+        tid = body.get("id", "")
+        for item in data[side]:
+            if item["id"] == tid:
+                item["done"] = not item["done"]
+                break
+    elif action == "del":
+        tid = body.get("id", "")
+        data[side] = [x for x in data[side] if x["id"] != tid]
+    else:
+        return JSONResponse({"error": "unknown action"}, status_code=400)
+
+    with open(todo_path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, ensure_ascii=False)
+    return JSONResponse({"ok": True, **data})
+
+
+@mcp.custom_route("/api/night", methods=["GET"])
+async def api_night_get(request):
+    """Get night diary entries for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import glob as _glob
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"days": []})
+    try:
+        base = os.path.dirname(__file__)
+        night_dir = os.path.join(base, "night")
+        days = []
+        if os.path.isdir(night_dir):
+            for fp in sorted(_glob.glob(os.path.join(night_dir, "夜记-*.md")), reverse=True)[:30]:
+                date = os.path.basename(fp).replace("夜记-", "").replace(".md", "")
+                with open(fp, "r", encoding="utf-8") as f:
+                    raw = f.read()
+                entries = []
+                for line in raw.splitlines():
+                    m = re.match(r"^(\d{2}:\d{2})\s+(.*)", line)
+                    if m:
+                        entries.append({"t": m.group(1), "text": m.group(2)})
+                    elif entries and line.startswith("   "):
+                        entries[-1]["text"] += "\n" + line.strip()
+                days.append({"date": date, "entries": entries})
+        return JSONResponse({"days": days})
+    except Exception as e:
+        return JSONResponse({"days": [], "error": str(e)})
+
+
+@mcp.custom_route("/api/wall", methods=["GET"])
+async def api_wall_get(request):
+    """Get diary wall bricks for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import glob as _glob
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"ok": True, "bricks": []})
+    lite = request.query_params.get("lite", "0") == "1"
+    try:
+        base = os.path.dirname(__file__)
+        story_dir = os.path.join(base, "story")
+        bricks = []
+        if os.path.isdir(story_dir):
+            for fp in sorted(_glob.glob(os.path.join(story_dir, "记忆-*.md")), reverse=True)[:60]:
+                date = os.path.basename(fp).replace("记忆-", "").replace(".md", "")
+                with open(fp, "r", encoding="utf-8") as f:
+                    text = f.read()
+                for seg in re.split(r"\n-{3,}\n", text):
+                    s = re.search(r"情绪强度[:：]\s*([0-9])", seg)
+                    v = re.search(r"效价[:：]\s*([+-]?[0-9])", seg)
+                    a = re.search(r"唤醒度[:：]\s*([0-9])", seg)
+                    if not (s and v and a):
+                        continue
+                    lines = [l for l in seg.strip().splitlines() if l.strip() and not l.startswith("#")]
+                    title = lines[0][:60] if lines else ""
+                    bricks.append({
+                        "date": date,
+                        "title": title,
+                        "s": int(s.group(1)),
+                        "v": int(v.group(1)),
+                        "a": int(a.group(1)),
+                        "text": "" if lite else seg.strip()[:2000],
+                    })
+        return JSONResponse({"ok": True, "bricks": bricks})
+    except Exception as e:
+        return JSONResponse({"ok": False, "bricks": [], "error": str(e)})
+
+
+@mcp.custom_route("/api/herdiary", methods=["GET"])
+async def api_herdiary_get(request):
+    """Get user's own diary for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"items": []})
+    try:
+        path = os.path.join(os.path.dirname(__file__), ".home-her-diary.json")
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            return JSONResponse(data)
+        return JSONResponse({"items": []})
+    except Exception as e:
+        return JSONResponse({"items": [], "error": str(e)})
+
+
+@mcp.custom_route("/api/herdiary", methods=["POST"])
+async def api_herdiary_post(request):
+    """Add/delete entry in user's own diary for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    path = os.path.join(os.path.dirname(__file__), ".home-her-diary.json")
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+    else:
+        data = {"items": []}
+
+    if body.get("del"):
+        did = body.get("id", "")
+        data["items"] = [x for x in data["items"] if x.get("id") != did]
+    else:
+        import secrets as _secrets
+        data["items"].append({
+            "id": _secrets.token_hex(6),
+            "at": int(time.time()),
+            "text": str(body.get("text", "")).strip(),
+        })
+        data["items"] = data["items"][-500:]
+
+    with open(path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, ensure_ascii=False)
+    return JSONResponse({"ok": True, **data})
+
+
+@mcp.custom_route("/api/favlines", methods=["GET"])
+async def api_favlines_get(request):
+    """Get favorite quotes for dwell frontend."""
+    from starlette.responses import JSONResponse
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"ok": True, "text": ""})
+    try:
+        path = os.path.join(os.path.dirname(__file__), "favlines.md")
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+        else:
+            text = ""
+        return JSONResponse({"ok": True, "text": text})
+    except Exception as e:
+        return JSONResponse({"ok": False, "text": "", "error": str(e)})
+
+
+@mcp.custom_route("/api/cal", methods=["GET"])
+async def api_cal_get(request):
+    """Get calendar events for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"ok": True, "events": [], "period": None})
+    try:
+        path = os.path.join(os.path.dirname(__file__), ".home-cal.json")
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            return JSONResponse({"ok": True, **data})
+        return JSONResponse({"ok": True, "events": [], "period": None})
+    except Exception as e:
+        return JSONResponse({"ok": False, "events": [], "period": None, "error": str(e)})
+
+
+@mcp.custom_route("/api/cal", methods=["POST"])
+async def api_cal_post(request):
+    """Add/update calendar event for dwell frontend."""
+    from starlette.responses import JSONResponse
+    import json as _json
+    err = _require_dashboard_auth(request)
+    if err:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+
+    path = os.path.join(os.path.dirname(__file__), ".home-cal.json")
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+    else:
+        data = {"events": [], "period": None}
+
+    import secrets as _secrets
+    action = body.get("action", "add")
+    if action == "del":
+        eid = body.get("id", "")
+        data["events"] = [e for e in data["events"] if e.get("id") != eid]
+    elif action == "period":
+        data["period"] = body.get("period")
+    else:
+        data["events"].append({
+            "id": _secrets.token_hex(6),
+            "date": str(body.get("date", "")),
+            "text": str(body.get("text", "")).strip(),
+            "mood": body.get("mood"),
+        })
+
+    with open(path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, ensure_ascii=False)
+    return JSONResponse({"ok": True, **data})
+
+
+# --- Static File Serving (dwell frontend from public/) ---
 # StaticFiles will be mounted in main app setup after all API routes are registered
 
 
