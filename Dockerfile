@@ -22,6 +22,7 @@ COPY resources ./resources
 COPY scripts ./scripts
 COPY dashboard.html .
 COPY dashboard_assets ./dashboard_assets
+COPY public ./public
 COPY config.example.yaml ./config.yaml
 RUN chmod +x scripts/*.sh
 
