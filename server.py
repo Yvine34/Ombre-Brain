@@ -3155,8 +3155,11 @@ async def _refresh_bucket_embedding_async(bucket_id: str) -> None:
 # 供 Cloudflare Tunnel 或反代定期 ping，防止空闲超时断连
 # =============================================================
 @mcp.custom_route("/", methods=["GET"])
-async def root_redirect(request):
-    from starlette.responses import RedirectResponse
+async def root_index(request):
+    from starlette.responses import FileResponse, RedirectResponse
+    index_path = os.path.join(os.path.dirname(__file__), "public", "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
     return RedirectResponse(url="/dashboard")
 
 
