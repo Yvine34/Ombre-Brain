@@ -10812,8 +10812,8 @@ async def api_moments(request):
     return JSONResponse(payload)
 
 
-@mcp.custom_route("/api/todos", methods=["GET"])
-async def api_todos(request):
+@mcp.custom_route("/api/todos-derived", methods=["GET"])
+async def api_todos_derived(request):
     """Deprecated: derived followup/todo items are disabled."""
     from starlette.responses import JSONResponse
     err = _require_dashboard_auth(request)
@@ -10829,8 +10829,8 @@ async def api_todos(request):
     )
 
 
-@mcp.custom_route("/api/todos/{todo_id}", methods=["PATCH"])
-async def api_todo_update(request):
+@mcp.custom_route("/api/todos-derived/{todo_id}", methods=["PATCH"])
+async def api_todo_derived_update(request):
     """Deprecated: derived followup/todo items are disabled."""
     from starlette.responses import JSONResponse
     err = _require_dashboard_auth(request)
@@ -13725,7 +13725,7 @@ async def api_todos_post(request):
         data = {"mine": [], "hers": []}
 
     action = body.get("action", "")
-    side = body.get("side", "mine")
+    side = body.get("side") or body.get("list") or "mine"
     if side not in ("mine", "hers"):
         return JSONResponse({"error": "invalid side"}, status_code=400)
 
