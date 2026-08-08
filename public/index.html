@@ -4001,7 +4001,7 @@ function diaryHead(mode) {
   if (mode !== 'bento') nav.appendChild(mk('主页', 'bento', renderBento));
   const h1 = document.createElement('h1'); h1.textContent = '日记';
   const sub = document.createElement('div'); sub.className = 'sub';
-  const _days = Math.floor((Date.now() - new Date('2026-06-17T00:00:00+08:00')) / 86400e3) + 1;
+  const _days = Math.floor((Date.now() - new Date('2026-07-20T00:00:00+08:00')) / 86400e3) + 1;
   sub.textContent = '在一起 ' + _days + ' 天';
   head.append(nav, h1, sub);
   return head;
