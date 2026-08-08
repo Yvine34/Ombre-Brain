@@ -13689,9 +13689,6 @@ async def api_todos_get(request):
     """Get todos for dwell frontend."""
     from starlette.responses import JSONResponse
     import json as _json
-    err = _require_dashboard_auth(request)
-    if err:
-        return JSONResponse({"ok": True, "mine": [], "hers": []})
     try:
         todo_path = os.path.join(os.path.dirname(__file__), ".home-todos.json")
         if os.path.isfile(todo_path):
@@ -13709,9 +13706,6 @@ async def api_todos_post(request):
     """Modify todos for dwell frontend."""
     from starlette.responses import JSONResponse
     import json as _json
-    err = _require_dashboard_auth(request)
-    if err:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
     except Exception:

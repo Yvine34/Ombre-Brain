@@ -5175,7 +5175,7 @@ document.getElementById('navTodo').onclick = () => { closeDrawer(); sheets.todo.
 
 async function loadTodos() {
   try {
-    const d = await (await fetch('api/todos', { cache: 'no-store' })).json();
+    const d = await (await fetch('/api/todos', { cache: 'no-store' })).json();
     renderTodos(d);
   } catch {
     todoBody.innerHTML = '<div class="todo-empty">清单拿不到，网抖了一下，再开一次试试</div>';
@@ -5183,7 +5183,7 @@ async function loadTodos() {
 }
 async function todoAct(payload) {
   try {
-    const r = await fetch('api/todos', {
+    const r = await fetch('/api/todos', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
@@ -5253,6 +5253,8 @@ function todoRow(t, list, canTouch) {
   return r;
 }
 function renderTodos(d) {
+  if (!d || !Array.isArray(d.hers)) d = Object.assign({ hers: [], mine: [] }, d);
+  if (!Array.isArray(d.mine)) d.mine = [];
   const keepTop = todoBody.scrollTop;
   const dt = new Date(Date.now() + (8 * 60 + new Date().getTimezoneOffset()) * 60000);
   const total = d.hers.length, paid = d.hers.filter(t => t.done).length;
