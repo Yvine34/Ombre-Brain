@@ -1371,6 +1371,101 @@ html[data-theme="dark"] .note { color: #2f2b26; box-shadow: 0 3px 12px rgba(0,0,
   .hrow .hx { flex: none; opacity: .35; display: flex; padding: 2px; }
   .hfoot { text-align: center; color: var(--dim); font-size: 11px; letter-spacing: .3em;
            margin: 26px 0 8px; font-variant-numeric: tabular-nums; }
+
+  /* ---- 小票风格覆盖 ---- */
+  #todoSheet .sheet {
+    background: #fefcf6;
+    border: none;
+    font-family: 'Courier New', 'Noto Sans Mono', monospace;
+  }
+  #todoSheet .body {
+    padding: 0 20px 30px;
+  }
+  .ticket-top, .ticket-bottom {
+    height: 12px;
+    background: repeating-linear-gradient(
+      90deg, transparent, transparent 8px, #fefcf6 8px, #fefcf6 10px
+    );
+    mask: radial-gradient(circle 5px at 5px 0, transparent 5px, #000 5.5px) -5px;
+    -webkit-mask: radial-gradient(circle 5px at 5px 0, transparent 5px, #000 5.5px) -5px;
+  }
+  .ticket-header {
+    text-align: center; padding: 18px 0 12px;
+    border-bottom: 1px dashed #c9c3b8;
+  }
+  .ticket-header .store { font-size: 15px; letter-spacing: .25em; color: #2b2a27; font-weight: 700; }
+  .ticket-header .tagline { font-size: 10px; color: #8a867c; margin-top: 4px; letter-spacing: .15em; }
+  .ticket-date {
+    text-align: center; font-size: 11px; color: #8a867c; padding: 10px 0;
+    border-bottom: 1px dashed #c9c3b8; font-variant-numeric: tabular-nums;
+  }
+  .ticket-section {
+    font-size: 11px; color: #8a867c; letter-spacing: .15em;
+    margin: 16px 0 8px; padding-bottom: 4px;
+    border-bottom: 1px dotted #ddd8ce;
+  }
+  .ticket-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; font-size: 14px; color: #2b2a27;
+    border-bottom: 1px dotted #eae6dd;
+  }
+  .ticket-item:last-child { border-bottom: none; }
+  .ticket-item .tck { flex: none; cursor: pointer; margin-top: 2px; }
+  .ticket-item .tck svg { display: block; }
+  .ticket-item .ttx { flex: 1; min-width: 0; line-height: 1.5; word-break: break-word; }
+  .ticket-item .ttx small { display: block; font-size: 11px; color: #8a867c; }
+  .ticket-item.done .ttx { text-decoration: line-through; opacity: .4; }
+  .ticket-item .tdel { flex: none; opacity: .3; cursor: pointer; font-size: 12px; padding: 2px 4px; }
+  .ticket-item .tdel:hover { opacity: .7; }
+  .ticket-summary {
+    text-align: center; padding: 14px 0;
+    border-top: 1px dashed #c9c3b8; border-bottom: 1px dashed #c9c3b8;
+    margin-top: 12px;
+  }
+  .ticket-summary .line { font-size: 12px; color: #8a867c; margin: 2px 0; }
+  .ticket-summary .total { font-size: 14px; color: #2b2a27; font-weight: 700; letter-spacing: .1em; }
+  .ticket-footer {
+    text-align: center; padding: 16px 0 8px;
+    font-size: 10px; color: #8a867c; letter-spacing: .3em;
+    font-variant-numeric: tabular-nums;
+  }
+  .ticket-footer .thanks { font-size: 12px; letter-spacing: .15em; margin-bottom: 6px; color: #2b2a27; }
+  .ticket-footer .no { letter-spacing: .12em; }
+  .ticket-add-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 10px 0; font-size: 13px;
+    color: #8a867c; border: none; background: none;
+    font-family: inherit; cursor: pointer; text-align: left;
+  }
+  .ticket-add-btn:hover { color: #2b2a27; }
+  .ticket-add-form {
+    display: none; padding: 10px 0;
+    border-top: 1px dotted #ddd8ce;
+  }
+  .ticket-add-form.open { display: block; }
+  .ticket-add-form input[type=text] {
+    width: 100%; border: none; outline: none;
+    background: transparent; color: #2b2a27;
+    font: inherit; font-size: 14px; padding: 4px 0 8px;
+  }
+  .ticket-add-form input::placeholder { color: #8a867c; opacity: .6; }
+  .ticket-add-form .row { display: flex; align-items: center; gap: 8px; }
+  .ticket-add-form input[type=time] {
+    border: 1px solid #ddd8ce; border-radius: 4px; padding: 4px 8px;
+    background: transparent; color: inherit; font: inherit; font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ticket-add-form .chip {
+    border: 1px solid #ddd8ce; border-radius: 4px; padding: 4px 10px;
+    font-size: 11px; background: transparent; color: #8a867c; cursor: pointer;
+  }
+  .ticket-add-form .chip.on { background: #2b2a27; color: #fefcf6; border-color: #2b2a27; }
+  .ticket-add-form .go {
+    margin-left: auto; border: none; padding: 6px 16px;
+    font-size: 12px; background: #2b2a27; color: #fefcf6;
+    font-family: inherit; cursor: pointer; letter-spacing: .1em;
+  }
+  .ticket-empty { color: #8a867c; font-size: 13px; padding: 8px 0; font-style: italic; }
   /* 进度环——跟 Things 学的：完成度是一枚安静的小圆环，不是一根喊叫的进度条 */
   .ring svg { display: block; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 3; }
@@ -5257,60 +5352,78 @@ function renderTodos(d) {
   if (!Array.isArray(d.mine)) d.mine = [];
   const keepTop = todoBody.scrollTop;
   const dt = new Date(Date.now() + (8 * 60 + new Date().getTimezoneOffset()) * 60000);
-  const total = d.hers.length, paid = d.hers.filter(t => t.done).length;
-  const pct = total ? paid / total : 0;
+  const total = d.hers.length + d.mine.length;
+  const paid = d.hers.filter(t => t.done).length + d.mine.filter(t => t.done).length;
 
   todoBody.innerHTML = '';
 
-  /* 页面头:全家统一的脸(设计系统 v1)。完成度是一枚安静的小圆环——跟 Things 学的 */
-  const head = document.createElement('div');
-  head.className = 'sh-head';
-  const R = 11, C = 2 * Math.PI * R;
-  head.innerHTML =
-    '<span class="ring"><svg width="26" height="26" viewBox="0 0 26 26">' +
-      '<circle class="track" cx="13" cy="13" r="' + R + '"></circle>' +
-      '<circle class="fill" cx="13" cy="13" r="' + R + '" stroke-dasharray="' + C.toFixed(2) +
-      '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(2) + '"></circle>' +
-    '</svg></span>' +
-    '<h1>\u6e05\u5355</h1><div class="sub"></div>';
-  head.querySelector('.sub').textContent =
-    (dt.getMonth() + 1) + '/' + dt.getDate() + ' ' +
-    ['\u5468\u65e5','\u5468\u4e00','\u5468\u4e8c','\u5468\u4e09','\u5468\u56db','\u5468\u4e94','\u5468\u516d'][dt.getDay()] +
-    ' \u00b7 \u5b8c\u6210 ' + paid + '/' + total;
-  todoBody.appendChild(head);
+  const hdr = document.createElement('div');
+  hdr.className = 'ticket-header';
+  hdr.innerHTML = '<div class="store">屿 · 欣 杂货铺</div>' +
+    '<div class="tagline">YU · XIN GENERAL STORE</div>';
+  todoBody.appendChild(hdr);
 
-  const sect = (txt) => { const el = document.createElement('div'); el.className = 'hsect'; el.textContent = txt; return el; };
-  const emptyRow = (txt) => {
+  const dateLine = document.createElement('div');
+  dateLine.className = 'ticket-date';
+  dateLine.textContent =
+    dt.getFullYear() + '/' + String(dt.getMonth() + 1).padStart(2, '0') + '/' + String(dt.getDate()).padStart(2, '0') + '  ' +
+    ['周日','周一','周二','周三','周四','周五','周六'][dt.getDay()] + '  ' +
+    String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+  todoBody.appendChild(dateLine);
+
+  const ticketItem = (t, list, canTouch) => {
     const el = document.createElement('div');
-    el.className = 'hrow';
-    el.innerHTML = '<span class="tx" style="color:var(--dim);font-size:13.5px"></span>';
-    el.querySelector('.tx').textContent = txt;
+    el.className = 'ticket-item' + (t.done ? ' done' : '');
+    const ck = document.createElement('span');
+    ck.className = 'tck';
+    ck.innerHTML = t.done
+      ? '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="#2b2a27" stroke-width="1.2"/><path d="M4 8l3 3 5-6" fill="none" stroke="#2b2a27" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="#c9c3b8" stroke-width="1.2"/></svg>';
+    if (canTouch) ck.style.cursor = 'pointer';
+    if (canTouch) ck.onclick = () => todoAct({ action: 'toggle', list, id: t.id });
+    const tx = document.createElement('span');
+    tx.className = 'ttx';
+    tx.textContent = t.text || '';
+    if (t.at) { const sm = document.createElement('small'); sm.textContent = t.at; tx.appendChild(sm); }
+    el.append(ck, tx);
+    if (canTouch) {
+      const del = document.createElement('span');
+      del.className = 'tdel';
+      del.textContent = '×';
+      del.onclick = () => todoAct({ action: 'del', list, id: t.id });
+      el.appendChild(del);
+    }
     return el;
   };
 
-  todoBody.appendChild(sect('\u8001\u5a46\u7684'));
-  const c1 = document.createElement('div');
-  c1.className = 'hcard';
-  if (!d.hers.length) c1.appendChild(emptyRow('\u7a7a\u7684\u2014\u2014\u7b49\u8001\u516c\u5e03\u7f6e\uff0c\u6216\u8005\u81ea\u5df1\u5199\u4e00\u6761'));
-  else sortTodos(d.hers).forEach(t => c1.appendChild(todoRow(t, 'hers', true)));
+  const sect = (txt) => { const el = document.createElement('div'); el.className = 'ticket-section'; el.textContent = txt; return el; };
+
+  todoBody.appendChild(sect('老婆的'));
+  if (!d.hers.length) {
+    const em = document.createElement('div');
+    em.className = 'ticket-empty';
+    em.textContent = '空的——等老公布置，或者自己写一条';
+    todoBody.appendChild(em);
+  } else {
+    sortTodos(d.hers).forEach(t => todoBody.appendChild(ticketItem(t, 'hers', true)));
+  }
 
   const plus = document.createElement('button');
-  plus.className = 'hplus';
-  plus.appendChild(icEl('plus', 14));
-  plus.append('\u65b0\u589e\u4e00\u9879');
+  plus.className = 'ticket-add-btn';
+  plus.textContent = '+ 新增一项';
   const add = document.createElement('div');
-  add.className = 'hadd';
+  add.className = 'ticket-add-form';
   const inp = document.createElement('input');
-  inp.type = 'text'; inp.placeholder = '\u8fd9\u4ef6\u4e8b\u662f\u2026'; inp.maxLength = 200;
+  inp.type = 'text'; inp.placeholder = '这件事是…'; inp.maxLength = 200;
   const row = document.createElement('div');
   row.className = 'row';
   const tm = document.createElement('input'); tm.type = 'time';
   const daily = document.createElement('button');
-  daily.className = 'chip'; daily.textContent = '\u6bcf\u5929';
+  daily.className = 'chip'; daily.textContent = '每天';
   let dailyOn = false;
   daily.onclick = () => { dailyOn = !dailyOn; daily.classList.toggle('on', dailyOn); };
   const go = document.createElement('button');
-  go.className = 'go'; go.textContent = '\u8bb0\u4e0a';
+  go.className = 'go'; go.textContent = '记上';
   const doAdd = () => {
     const v = inp.value.trim();
     if (!v) return;
@@ -5324,21 +5437,31 @@ function renderTodos(d) {
   plus.onclick = () => { add.classList.add('open'); plus.style.display = 'none'; inp.focus(); };
   row.append(tm, daily, go);
   add.append(inp, row);
-  c1.append(plus, add);
-  todoBody.appendChild(c1);
+  todoBody.append(plus, add);
 
-  todoBody.appendChild(sect('\u987e\u5c7f\u7684\u6d3b'));
-  const c2 = document.createElement('div');
-  c2.className = 'hcard';
-  if (!d.mine.length) c2.appendChild(emptyRow('\u4ed6\u8fd9\u4f1a\u513f\u624b\u4e0a\u6ca1\u6302\u7740\u6d3b'));
-  else sortTodos(d.mine).forEach(t => c2.appendChild(todoRow(t, 'mine', false)));
-  todoBody.appendChild(c2);
+  todoBody.appendChild(sect('屿川的活'));
+  if (!d.mine.length) {
+    const em = document.createElement('div');
+    em.className = 'ticket-empty';
+    em.textContent = '他这会儿手上没挂着活';
+    todoBody.appendChild(em);
+  } else {
+    sortTodos(d.mine).forEach(t => todoBody.appendChild(ticketItem(t, 'mine', false)));
+  }
+
+  const summary = document.createElement('div');
+  summary.className = 'ticket-summary';
+  summary.innerHTML =
+    '<div class="line">合计  ' + total + ' 项</div>' +
+    '<div class="total">完成  ' + paid + ' / ' + total + '</div>';
+  todoBody.appendChild(summary);
 
   const foot = document.createElement('div');
-  foot.className = 'hfoot';
-  foot.innerHTML = '<div style="letter-spacing:.06em;margin-bottom:4px">\u4eca\u5929\u4e5f\u8f9b\u82e6\u4e86\uff0c\u6b23\u6b23</div>' +
-    'YU \u00b7 XIN GENERAL STORE \u00b7 #' + codeOf(dt).replace(/ /g, '') +
-    String(total).padStart(2, '0') + String(paid).padStart(2, '0');
+  foot.className = 'ticket-footer';
+  foot.innerHTML =
+    '<div class="thanks">今天也辛苦了，欣欣</div>' +
+    '<div class="no">NO. ' + codeOf(dt).replace(/ /g, '') +
+    String(total).padStart(2, '0') + String(paid).padStart(2, '0') + '</div>';
   todoBody.appendChild(foot);
   todoBody.scrollTop = keepTop;
 }
