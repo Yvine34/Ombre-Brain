@@ -5341,10 +5341,10 @@ function renderTodos(d) {
     '<div class="tk-kv"><span>单据号</span><span>#' + codeOf(dt).replace(/ /g, '-') + '-' + String(total).padStart(3, '0') + '</span></div>';
   todoBody.appendChild(info);
 
-  /* ---- 老婆的订单 ---- */
+  /* ---- 小颖的订单 ---- */
   const s1 = document.createElement('div');
   s1.className = 'tk-sect';
-  s1.textContent = '今日订单 · 老婆 · ' + hersTotal + ' 项';
+  s1.textContent = '今日订单 · 小颖 · ' + hersTotal + ' 项';
   todoBody.appendChild(s1);
 
   const list1 = document.createElement('div');
@@ -5352,7 +5352,7 @@ function renderTodos(d) {
   if (!hersTotal) {
     const em = document.createElement('div');
     em.className = 'tk-empty';
-    em.textContent = '空的——等老公布置，或者自己写一条';
+    em.textContent = '空的——等屿川布置，或者自己写一条';
     list1.appendChild(em);
   } else {
     sortTodos(d.hers).forEach(t => list1.appendChild(tkRow(t, 'hers', true, dt)));
