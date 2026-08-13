@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
-<title>Claude</title>
+<title>Nous</title>
 
 <link rel="icon" href="icons/favicon-64.png" sizes="64x64" type="image/png">
 <link rel="icon" href="icons/favicon.ico" sizes="any">
@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Claude">
+<meta name="apple-mobile-web-app-title" content="Nous">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>
 /* 夜间模式：跟随系统 / 常亮 / 常暗，三态轮换，记在本地。
@@ -1654,8 +1654,8 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
 <header>
   <button class="iconbtn glass" id="menuBtn" title="打开侧边栏"><span class="ic" data-i="chevL"></span></button>
   <div class="title">
-    <h1>Claude</h1>
-    <div class="sub">Claude Code</div>
+    <h1>屿川</h1>
+    <div class="sub">Nous</div>
   </div>
   <button class="iconbtn glass" id="dotsBtn" title="更多"><span class="ic" data-i="dots"></span></button>
 </header>
@@ -1716,7 +1716,7 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
 <div id="drawerWrap">
   <div class="shade" data-close="drawer"></div>
   <div id="drawer">
-    <div class="brand">Claude</div>
+    <div class="brand">Nous</div>
     <div class="nav">
       <button class="item on"><span class="ic" data-i="chat"></span>聊天</button>
       <button class="item" id="navTodo"><span class="ic" data-i="checkSquare"></span>待办</button>
@@ -1727,7 +1727,7 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
       <button class="item" id="navHealth"><span class="ic" data-i="heartIc"></span>健康</button>
       <button class="item" id="navRepo"><span class="ic" data-i="box"></span>仓库</button>
       <div class="sect">Recents</div>
-      <button class="recent" id="recGu">Claude</button>
+      <button class="recent" id="recGu">屿川</button>
       <button class="recent" id="recGong">另一位</button>
     </div>
     <div class="drawer-foot">
@@ -6090,8 +6090,8 @@ function ago(ts) {
 }
 
 function setTitle(name) {
-  document.querySelector('header .title h1').textContent = name || 'Claude';
-  document.title = name || 'Claude';
+  document.querySelector('header .title h1').textContent = name || '屿川';
+  document.title = name || 'Nous';
 }
 
 async function loadChats() {
