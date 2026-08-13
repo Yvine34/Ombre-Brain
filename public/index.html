@@ -5405,7 +5405,7 @@ function renderTodos(d) {
     em.textContent = '他这会儿手上没挂着活';
     list2.appendChild(em);
   } else {
-    sortTodos(d.mine).forEach(t => list2.appendChild(tkRow(t, 'mine', false, dt)));
+    sortTodos(d.mine).forEach(t => list2.appendChild(tkRow(t, 'mine', true, dt)));
   }
   todoBody.appendChild(list2);
 
@@ -5413,7 +5413,7 @@ function renderTodos(d) {
   const foot = document.createElement('div');
   foot.className = 'tk-foot';
   foot.innerHTML =
-    '<div class="tk-thanks">今天也辛苦了，欣欣</div>' +
+    '<div class="tk-thanks">今天也辛苦了，小颖</div>' +
     '<div class="tk-barcode">||||| |||| ||||| |||| ||||| ||||</div>';
   todoBody.appendChild(foot);
   todoBody.scrollTop = keepTop;
