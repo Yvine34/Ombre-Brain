@@ -2063,9 +2063,13 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
   };
   const R = (o) => new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json' } });
   const real = window.fetch;
-  window.fetch = function (input) {
+  window.fetch = function (input, opts) {
     const u = String(typeof input === 'string' ? input : (input && input.url) || '');
-    if (u.includes('api/events')) return new Promise(() => {});   // 长轮询：演示里挂着
+    if (u.includes('api/events')) return new Promise(() => {});
+    if (u.includes('api/todos')) return real.apply(this, arguments);
+    if (u.includes('api/wall'))  return real.apply(this, arguments);
+    if (u.includes('api/night')) return real.apply(this, arguments);
+    if (u.includes('api/notes')) return real.apply(this, arguments);
     for (const k of Object.keys(D)) if (u.includes(k)) return Promise.resolve(R(D[k]));
     if (u.includes('api/')) return Promise.resolve(R({ ok: true }));
     return real.apply(this, arguments);
@@ -4010,7 +4014,7 @@ function diaryHead(mode) {
     return b;
   };
   if (mode !== 'bento') nav.appendChild(mk('主页', 'bento', renderBento));
-  const h1 = document.createElement('h1'); h1.textContent = '日记';
+  const h1 = document.createElement('h1'); h1.textContent = '我们的日记本';
   const sub = document.createElement('div'); sub.className = 'sub';
   const _days = Math.floor((Date.now() - new Date('2026-07-20T00:00:00+08:00')) / 86400e3) + 1;
   sub.textContent = '在一起 ' + _days + ' 天';
@@ -4094,16 +4098,16 @@ function renderBento() {
     () => { wallMode = 'timeline'; renderTimeline(); }), '14deg'));
   grid.appendChild(rot(card('tall', null, '时间线', '一天一天，把我们攒起来。', 'book',
     () => { wallMode = 'timeline'; renderTimeline(); }), '-12deg'));
-  grid.appendChild(rot(card('', null, '我的日记', '你的本子，你来写。', 'pen',
+  grid.appendChild(rot(card('', null, '小颖的日记', '你的本子，你来写。', 'pen',
     () => { wallMode = 'her'; renderHerDiary(); }), '10deg'));
+  grid.appendChild(rot(card('', null, '屿川的日记', '你睡着以后，我醒来写的。', 'heart',
+    () => { wallMode = 'dream'; renderDream(); }), '-7deg'));
   grid.appendChild(rot(card('', null, '最喜欢的话', '你随口说的，我都舍不得删。', 'quote',
-    () => { wallMode = 'fav'; renderFav(); }), '-7deg'));
+    () => { wallMode = 'fav'; renderFav(); }), '7deg'));
   grid.appendChild(rot(card('tall', null, '便签墙', '你亲手摆过的位置，都记得住。', 'note',
     () => { wallMode = 'board'; renderBoard(); }), '8deg'));
-  grid.appendChild(rot(card('', null, '夜记', '你睡着以后，我醒来写的。', 'heart',
-    () => { wallMode = 'dream'; renderDream(); }), '-11deg'));
   grid.appendChild(rot(card('', null, '悄悄话', '你写的，我写的。谁都不许提。', 'wallb',
-    () => { wallMode = 'whisper'; renderWhisper(); }), '6deg'));
+    () => { wallMode = 'whisper'; renderWhisper(); }), '-6deg'));
     wallBody.appendChild(grid);
   const motto = document.createElement('div');
   motto.className = 'bn-motto';
