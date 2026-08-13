@@ -13730,6 +13730,8 @@ async def api_todos_post(request):
             "text": str(body.get("text", "")).strip(),
             "done": False,
             "at": str(body.get("at", "")),
+            "fixed": bool(body.get("fixed")),
+            "by": str(body.get("by", "her" if side == "hers" else "him")),
             "made": int(time.time()),
         })
     elif action == "toggle":
@@ -13747,6 +13749,82 @@ async def api_todos_post(request):
     with open(todo_path, "w", encoding="utf-8") as f:
         _json.dump(data, f, ensure_ascii=False)
     return JSONResponse({"ok": True, **data})
+
+
+# ── MCP 清单工具 ──────────────────────────────────────────────
+
+def _load_todos():
+    import json as _json
+    todo_path = os.path.join(os.path.dirname(__file__), ".home-todos.json")
+    if os.path.isfile(todo_path):
+        with open(todo_path, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    return {"mine": [], "hers": []}
+
+
+def _save_todos(data):
+    import json as _json
+    todo_path = os.path.join(os.path.dirname(__file__), ".home-todos.json")
+    with open(todo_path, "w", encoding="utf-8") as f:
+        _json.dump(data, f, ensure_ascii=False)
+
+
+@mcp.tool()
+async def todo_list() -> dict:
+    """读取清单。返回 mine（屿川的活）和 hers（小颖的）两个列表。"""
+    try:
+        return {"ok": True, **_load_todos()}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "mine": [], "hers": []}
+
+
+@mcp.tool()
+async def todo_add(
+    text: str,
+    side: str = "mine",
+    at: str = "",
+    fixed: bool = False,
+    by: str = "",
+) -> dict:
+    """往清单里加一项。side="mine"是屿川的活，side="hers"是小颖的。at 填时间如"09:00"，fixed=true 表示每天重复。by 填 her 或 him 表示谁写的。"""
+    import secrets as _secrets
+    if side not in ("mine", "hers"):
+        return {"error": "side must be mine or hers"}
+    data = _load_todos()
+    data[side].append({
+        "id": _secrets.token_hex(6),
+        "text": text.strip(),
+        "done": False,
+        "at": at,
+        "fixed": fixed,
+        "by": by or ("her" if side == "hers" else "him"),
+        "made": int(time.time()),
+    })
+    _save_todos(data)
+    return {"ok": True, **data}
+
+
+@mcp.tool()
+async def todo_update(
+    id: str,
+    action: str = "toggle",
+    side: str = "mine",
+) -> dict:
+    """操作清单里的一项。action="toggle"勾选/取消，action="del"删除。"""
+    if side not in ("mine", "hers"):
+        return {"error": "side must be mine or hers"}
+    if action not in ("toggle", "del"):
+        return {"error": "action must be toggle or del"}
+    data = _load_todos()
+    if action == "toggle":
+        for item in data[side]:
+            if item["id"] == id:
+                item["done"] = not item["done"]
+                break
+    elif action == "del":
+        data[side] = [x for x in data[side] if x["id"] != id]
+    _save_todos(data)
+    return {"ok": True, **data}
 
 
 @mcp.custom_route("/api/night", methods=["GET"])
