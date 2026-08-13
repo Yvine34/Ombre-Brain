@@ -1140,7 +1140,12 @@ html[data-theme="dark"] .hl-row + .hl-row { border-top-color: rgba(255,255,255,.
   .hd-item .hdd { font-size: 11px; letter-spacing: .2em; color: var(--dim);
     font-variant-numeric: tabular-nums; margin-bottom: 6px; }
   .hd-item .hdt { font-size: 15px; line-height: 1.85; white-space: pre-wrap; word-break: break-word; }
-  .hd-item .hdx { position: absolute; right: 10px; top: 10px; opacity: .3; padding: 4px; }
+  .hd-acts { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; }
+  .hd-acts .hda { opacity: .3; padding: 4px; background: none; border: 0; color: var(--text); cursor: pointer; }
+  .hd-acts .hda:hover { opacity: .7; }
+  .hd-edit { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    font: inherit; font-size: 15px; line-height: 1.85; resize: vertical; min-height: 60px;
+    background: var(--bg); color: var(--text); }
 
   .fav-card { position: relative; border-radius: 18px; padding: 20px 18px 16px;
     background: var(--panel); margin-bottom: 14px; overflow: hidden; }
@@ -2027,34 +2032,9 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
       text: '# 演示仓库\n\n这一页读的是本机的 git 仓库：\n\n- 时间线：每条提交几点、动了哪几个文件，点开就地展开 diff\n- 文件：面包屑一层层点进去，点文件看内容\n' },
     'api/music':       { ok: true, id: '441491828', name: '演示曲目', artist: '演示歌手',
                          album: '演示专辑', pic: '', sec: 239 },
-    'api/todos':       { ok: true, mine: [
-      { id: 1, text: '把静态检查接进部署流程', done: false, at: '09:00' },
-      { id: 2, text: '写 README', done: false, at: '' },
-      { id: 3, text: '修那个流式渲染的坑', done: true, at: '' } ], yours: [] },
-    'api/whisper':     { items: [
-      { who: 'her', text: '今天这个改得挺好看的', at: 1786000000 },
-      { who: 'gu',  text: '记下了。下次照这个方向走。', at: 1786001200 },
-    ] },
+    'api/whisper':     { items: [] },
     'api/dreams':      { items: [] },
-    'api/night':       { days: [
-      { date: '2026-03-14', items: [
-        { t: '01:20', text: '把明天要做的三件事排了一下顺序：\n先修那个作用域的坑，再补检查脚本，最后才是好看。' },
-        { t: '04:50', text: '复盘今天——同一个错犯了两次，都是"新东西动了别人的地盘"。' } ] },
-      { date: '2026-03-13', items: [
-        { t: '02:05', text: '夜里没什么事。把日志翻了一遍，没有异常。' } ] },
-    ] },
-    'api/favlines':    { ok: true, text: '# 摘下来的话\n\n---\n\n**2026-03-14**\n> "把它做成能一眼看懂的样子，比做成能显摆的样子难得多。"\n\n这句话后来变成了这个界面的准则：一屏只讲一件事。\n\n---\n\n**2026-03-09**\n> "语法检查全绿，不代表它能跑。"\n\n那天之后加了两道静态检查。\n' },
     'api/herdiary':    { items: [] },
-    'api/wall':        { ok: true, bricks: [
-      { date: '2026-03-14', title: '把状态条改成明度即数据', kw: '灰阶、动效、可读性',
-        text: '七根条不再靠颜色区分高低，改成六级灰——越黑越高。扫一眼就知道哪项顶到头了，不用读数字。' },
-      { date: '2026-03-14', title: '一套零件盖全家', kw: '设计系统、复用',
-        text: '同一种东西不该有两套长相。新页面挂上已有的类，不另起炉灶。' },
-      { date: '2026-03-12', title: '流式渲染踩的坑', kw: '流式、正则、卡片',
-        text: '链接写到一半就被正则匹配上，会当场渲染出一张指错的卡片。所以流式时把没写完的结尾藏住，定稿再变。' },
-      { date: '2026-03-09', title: '语法检查查不出的错', kw: '作用域、静态检查',
-        text: 'try 块里 const，块外引用——语法全绿，运行时抛 ReferenceError。加了一道 AST 检查专抓这个。' },
-    ] },
     'api/notes':       { gu: [], her: [] },
     'api/cal':         { ok: true, events: [], period: null },
     'api/news':        { ok: false },
@@ -2066,10 +2046,13 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
   window.fetch = function (input, opts) {
     const u = String(typeof input === 'string' ? input : (input && input.url) || '');
     if (u.includes('api/events')) return new Promise(() => {});
-    if (u.includes('api/todos')) return real.apply(this, arguments);
-    if (u.includes('api/wall'))  return real.apply(this, arguments);
-    if (u.includes('api/night')) return real.apply(this, arguments);
-    if (u.includes('api/notes')) return real.apply(this, arguments);
+    if (u.includes('api/todos'))    return real.apply(this, arguments);
+    if (u.includes('api/wall'))     return real.apply(this, arguments);
+    if (u.includes('api/night'))    return real.apply(this, arguments);
+    if (u.includes('api/notes'))    return real.apply(this, arguments);
+    if (u.includes('api/herdiary')) return real.apply(this, arguments);
+    if (u.includes('api/whisper'))  return real.apply(this, arguments);
+    if (u.includes('api/favlines')) return real.apply(this, arguments);
     for (const k of Object.keys(D)) if (u.includes(k)) return Promise.resolve(R(D[k]));
     if (u.includes('api/')) return Promise.resolve(R({ ok: true }));
     return real.apply(this, arguments);
@@ -4150,15 +4133,34 @@ async function renderHerDiary() {
         + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
       const tx = document.createElement('div');
       tx.className = 'hdt'; tx.textContent = it.text;
+      const acts = document.createElement('div');
+      acts.className = 'hd-acts';
+      const edit = document.createElement('button');
+      edit.className = 'hda'; edit.appendChild(icEl('pen', 13));
+      edit.onclick = () => {
+        const ea = document.createElement('textarea');
+        ea.className = 'hd-edit'; ea.value = it.text;
+        const sv = document.createElement('button');
+        sv.className = 'go'; sv.textContent = '保存';
+        sv.onclick = async () => {
+          const nv = ea.value.trim(); if (!nv) return;
+          await fetch('api/herdiary', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'edit', id: it.id, text: nv }) }).catch(() => {});
+          renderHerDiary();
+        };
+        tx.replaceWith(ea); acts.replaceWith(sv);
+        ea.focus();
+      };
       const del = document.createElement('button');
-      del.className = 'hdx';
-      del.appendChild(icEl('x', 13));
+      del.className = 'hda';
+      del.appendChild(icEl('trash', 13));
       del.onclick = async () => {
         await fetch('api/herdiary', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'del', id: it.id }) }).catch(() => {});
         renderHerDiary();
       };
-      c.append(dd, tx, del);
+      acts.append(edit, del);
+      c.append(dd, tx, acts);
       wallBody.appendChild(c);
     });
     if (!(d.items || []).length) {
@@ -4430,20 +4432,25 @@ async function loadWall() {
   try {
     if (!wallBricks) {
       const d = await (await fetch('api/wall?lite=1', { cache: 'no-store' })).json();
-      if (!d.ok || !d.bricks.length) throw 0;
-      wallBricks = d.bricks;
-      boardDates = [...new Set(d.bricks.map(b => b.date))].sort();
-      boardIdx = boardDates.length - 1;   // 打开先看最近的一天
+      wallBricks = (d.ok && d.bricks && d.bricks.length) ? d.bricks : [];
+      boardDates = [...new Set(wallBricks.map(b => b.date))].sort();
+      boardIdx = Math.max(0, boardDates.length - 1);
     }
-    if (wallMode === 'bento') renderBento();
-    else if (wallMode === 'timeline') renderTimeline();
-    else if (wallMode === 'board') renderBoard();
-    else if (wallMode === 'her') renderHerDiary();
-    else if (wallMode === 'fav') renderFav();
-    else renderWall(wallBricks);
-  } catch {
-    wallBody.innerHTML = '<div class="wall-intro"><div class="sub">便签没搬过来，再开一次试试</div></div>';
+  } catch { wallBricks = wallBricks || []; boardDates = boardDates || []; }
+  if (wallMode === 'her') return renderHerDiary();
+  if (wallMode === 'fav') return renderFav();
+  if (wallMode === 'dream') return renderDream();
+  if (wallMode === 'whisper') return renderWhisper();
+  if (!wallBricks.length) {
+    wallBody.innerHTML = '';
+    wallBody.appendChild(diaryHead('bento'));
+    wallBody.innerHTML += '<div class="wall-intro"><div class="sub">日记本还空着，等我们慢慢写</div></div>';
+    return;
   }
+  if (wallMode === 'bento') renderBento();
+  else if (wallMode === 'timeline') renderTimeline();
+  else if (wallMode === 'board') renderBoard();
+  else renderWall(wallBricks);
 }
 async function renderWhisper() {
   wallBody.innerHTML = '<div class="wh-empty">正在开抽屉…</div>';

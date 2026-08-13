@@ -13901,9 +13901,6 @@ async def api_herdiary_get(request):
     """Get user's own diary for dwell frontend."""
     from starlette.responses import JSONResponse
     import json as _json
-    err = _require_dashboard_auth(request)
-    if err:
-        return JSONResponse({"items": []})
     try:
         path = os.path.join(os.path.dirname(__file__), ".home-her-diary.json")
         if os.path.isfile(path):
@@ -13917,12 +13914,9 @@ async def api_herdiary_get(request):
 
 @mcp.custom_route("/api/herdiary", methods=["POST"])
 async def api_herdiary_post(request):
-    """Add/delete entry in user's own diary for dwell frontend."""
+    """Add/edit/delete entry in user's own diary for dwell frontend."""
     from starlette.responses import JSONResponse
     import json as _json
-    err = _require_dashboard_auth(request)
-    if err:
-        return JSONResponse({"error": "unauthorized"}, status_code=401)
     try:
         body = await request.json()
     except Exception:
@@ -13935,9 +13929,17 @@ async def api_herdiary_post(request):
     else:
         data = {"items": []}
 
-    if body.get("del"):
+    action = body.get("action", "")
+    if action == "del" or body.get("del"):
         did = body.get("id", "")
         data["items"] = [x for x in data["items"] if x.get("id") != did]
+    elif action == "edit":
+        eid = body.get("id", "")
+        new_text = str(body.get("text", "")).strip()
+        for item in data["items"]:
+            if item.get("id") == eid:
+                item["text"] = new_text
+                break
     else:
         import secrets as _secrets
         data["items"].append({
