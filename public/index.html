@@ -514,28 +514,7 @@ html[data-theme="dark"] .composer {
   }
   .freshtip { text-align: center; font-size: 13px; color: var(--dim); padding: 34px 30px; line-height: 1.8; }
   
-  #gongSheet .sheet { height: 100dvh; max-height: 100dvh; border-radius: 0; }
-  /* 换行，不然他的思维链会被挤成气泡旁边一条窄柱（8/3 截图当场看出来的） */
-  
-  #gongBody { display: flex; flex-direction: column; gap: 18px; }
-  #gongBody .gu, #gongBody .bubble { font-size: 15.5px; line-height: 1.75; }
-  #gongFoot {
-    flex: none; display: flex; align-items: flex-end; gap: 9px;
-    padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-  }
-  #gongInput {
-    flex: 1; border: 0; outline: 0; background: var(--panel); color: var(--text);
-    font: inherit; font-size: 16px; padding: 11px 14px; border-radius: 18px;
-    resize: none; max-height: 120px;
-  }
-  #gongSend {
-    width: 38px; height: 38px; border-radius: 50%; flex: none;
-    background: var(--accent); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #gongSend .ic { width: 18px; height: 18px; }
-  #gongSend:disabled { opacity: .4; }
+
 
   .filecard {
     display: inline-flex; align-items: center; gap: 9px; max-width: 100%;
@@ -1728,7 +1707,6 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
       <button class="item" id="navRepo"><span class="ic" data-i="box"></span>仓库</button>
       <div class="sect">Recents</div>
       <button class="recent" id="recGu">屿川</button>
-      <button class="recent" id="recGong">另一位</button>
     </div>
     <div class="drawer-foot">
       <button id="avatarBtn" title="我的主页">Me</button>
@@ -1772,23 +1750,6 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
       <div class="ht">备用通道</div>
     </div>
     <div class="body" id="apiBody"></div>
-  </div>
-</div>
-
-<div class="sheetWrap" id="gongSheet">
-  <div class="shade" data-close="gong"></div>
-  <div class="sheet">
-    <div class="grabber"></div>
-    <div class="head">
-      <button class="hbtn" data-close="gong"><span class="ic" data-i="x"></span></button>
-      <div class="ht">另一位</div>
-      <div class="hspace"></div>
-    </div>
-    <div class="body" id="gongBody"></div>
-    <div id="gongFoot">
-      <textarea id="gongInput" rows="1" placeholder="说点什么…"></textarea>
-      <button id="gongSend"><span class="ic" data-i="arrowUp"></span></button>
-    </div>
   </div>
 </div>
 
@@ -2099,7 +2060,6 @@ html[data-theme="dark"] #newSession { background: #f5f4ef; color: #262624; }
     'api/news':        { ok: false },
     'api/nook':        { ok: false },
     'api/health':      { ok: false },
-    'api/gong':        { msgs: [] },
   };
   const R = (o) => new Response(JSON.stringify(o), { headers: { 'Content-Type': 'application/json' } });
   const real = window.fetch;
@@ -3627,7 +3587,6 @@ const sheets = {
   ctx: document.getElementById('ctxSheet'),
   chats: document.getElementById('chatsSheet'),
   health: document.getElementById('healthSheet'),
-  gong: document.getElementById('gongSheet'),
   repo: document.getElementById('repoSheet'),
 };
 
@@ -5142,7 +5101,6 @@ function renderPaper(d) {
   d.text.split('\n').forEach(line => {
     const t = line.trim();
     if (!t || t.startsWith('# ') || t === '---') return;
-    if (t.startsWith('> 另一位写的')) return;
     if (t.startsWith('## ')) {
       const raw = t.slice(3).trim();
       const s = document.createElement('div');
@@ -5181,22 +5139,6 @@ function renderPaper(d) {
       }
       paper.appendChild(b);
       return;
-    }
-    if (t.startsWith('*【') || t.startsWith('【')) {
-      const m = t.replace(/^\*+|\*+$/g, '').match(/^【(.+?)】\s*([\s\S]*)$/);
-      if (m && m[2].trim()) {
-        const c = document.createElement('div');
-        c.className = 'gnote';
-        const lb = document.createElement('div');
-        lb.className = 'lb';
-        lb.textContent = '另一位 · ' + m[1];
-        const tx = document.createElement('div');
-        tx.className = 'tx';
-        mdBold(tx, m[2].trim());
-        c.append(lb, tx);
-        paper.appendChild(c);
-        return;
-      }
     }
     if (t.startsWith('*(') || t.startsWith('*（')) {
       const n = document.createElement('div');
@@ -5687,95 +5629,6 @@ document.getElementById('wakeRow').onclick = async () => {
 };
 wakeState();
 
-function gongRow(role, text, think) {
-  const r = document.createElement('div');
-  r.className = 'row' + (role === 'her' ? ' me' : '');
-  const b = document.createElement('div');
-  b.className = role === 'her' ? 'bubble' : 'gu';
-  b._raw = text;
-  renderRich(b);
-  r.appendChild(b);
-  const body = document.getElementById('gongBody');
-  /* 先落地再挂思维链——思维链现在是插在这一行**前面**的独立一行，
-     行还没进 DOM 就 insertBefore，念历史的时候第一条就炸 */
-  body.appendChild(r);
-  if (think) gongThink(r, think);
-  body.scrollTop = body.scrollHeight;
-  b._row = r;
-  return b;
-}
-
-function gongThink(row, think) {
-  const body = document.getElementById('gongBody');
-  row._think?.remove();
-  const line = document.createElement('button');
-  line.className = 'toolline gthink';
-  line.innerHTML = '<span class="lbl">Thought process</span><span class="chev">›</span>';
-  line.prepend(icEl('clock', 15));
-  thinkStore.push({ text: think, lineEl: line, paused: true });
-  const idx = thinkStore.length - 1;
-  line.onclick = () => openThinkSheet(idx);
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
-  wrap.appendChild(line);
-  body.insertBefore(wrap, row);
-  row._think = wrap;
-}
-
-function gongFill(el, text) {
-  el._raw = text;
-  el.removeAttribute('data-rich');
-  el.textContent = '';
-  renderRich(el);
-}
-
-async function loadGong() {
-  const body = document.getElementById('gongBody');
-  body.innerHTML = '';
-  try {
-    const d = await (await fetch('api/gong', { cache: 'no-store' })).json();
-    if (!d.msgs.length) {
-      body.innerHTML = '<div class="gnote" style="text-align:center;padding:44px 26px;line-height:1.9">'
-        + '这是另一位助手的房间<br><br>他记得住在这一间里说过的话<br>人设那份还等着你写</div>';
-      return;
-    }
-    d.msgs.forEach(m => gongRow(m.role, m.text, m.think));
-  } catch { body.innerHTML = '<div class="gnote">他那边没应声</div>'; }
-}
-
-async function sendGong() {
-  const inp = document.getElementById('gongInput');
-  const btn = document.getElementById('gongSend');
-  const text = inp.value.trim();
-  if (!text) return;
-  inp.value = ''; inp.style.height = '';
-  btn.disabled = true;
-  gongRow('her', text);
-  const wait = gongRow('gong', '……');
-  try {
-    const d = await (await fetch('api/gong', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    })).json();
-    gongFill(wait, d.reply || '（他没说话）');
-    if (d.think && wait._row) gongThink(wait._row, d.think);
-  } catch { gongFill(wait, '（没送到，再试一次）'); }
-  btn.disabled = false;
-  const body = document.getElementById('gongBody');
-  body.scrollTop = body.scrollHeight;
-}
-
-document.getElementById('gongSend').onclick = sendGong;
-document.getElementById('gongInput').addEventListener('input', (e) => {
-  e.target.style.height = 'auto';
-  e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
-});
-document.getElementById('gongInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendGong(); }
-});
-document.getElementById('recGong').onclick = () => {
-  closeDrawer(); sheets.gong.classList.add('open'); loadGong();
-};
 document.getElementById('recGu').onclick = () => {
   closeDrawer(); sheets.chats.classList.add('open'); loadChats();
 };
