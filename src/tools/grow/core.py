@@ -49,6 +49,13 @@ from .._common import (
 
 async def grow_core(content: str, test_data: bool = False) -> str:
     try:
+        from originals import append_original
+        _grow_backup_id = f"g_{uuid.uuid4().hex[:12]}"
+        _ok = append_original(rt.bucket_mgr.base_dir, _grow_backup_id, "日记原文", content)
+        rt.logger.info(f"原文备份: {_grow_backup_id} ok={_ok}")
+    except Exception as _oe:
+        rt.logger.error(f"原文备份失败（不影响正常运行）: {_oe}")
+    try:
         items = await rt.dehydrator.digest(content)
     except Exception as e:
         rt.logger.error(
@@ -190,6 +197,16 @@ async def grow_items(items: list, source_content: str = "", test_data: bool = Fa
             return f"原文证据保存失败，未创建任何桶：{safe_error_detail(exc)}"
 
     batch_id = f"g_{uuid.uuid4().hex[:12]}"
+
+    try:
+        from originals import append_original
+        _backup_text = source_content if source_content.strip() else "\n---\n".join(
+            item.get("content", "") for item in clean
+        )
+        _ok = append_original(rt.bucket_mgr.base_dir, batch_id, "预拆分原文", _backup_text)
+        rt.logger.info(f"原文备份: {batch_id} ok={_ok}")
+    except Exception as _oe:
+        rt.logger.error(f"原文备份失败（不影响正常运行）: {_oe}")
 
     async def _process_item(item: dict) -> dict:
         """处理一条预拆分 item：只打标不改写正文，独立于其它 item。"""

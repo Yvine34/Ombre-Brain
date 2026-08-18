@@ -988,6 +988,12 @@ async def _merge_or_create_inner(
                         else:
                             merged = old_text or new_text
                     else:
+                        try:
+                            from originals import append_original
+                            append_original(rt.bucket_mgr.base_dir, candidate_id, "合并前的旧内容", snapshot_content)
+                            append_original(rt.bucket_mgr.base_dir, candidate_id, "合并进来的新内容", content)
+                        except Exception as _oe:
+                            rt.logger.error(f"原文备份失败（不影响正常运行）: {_oe}")
                         merged = await rt.dehydrator.merge(
                             snapshot_content, content
                         )
