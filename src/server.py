@@ -68,6 +68,7 @@ from tools import trace as _t_trace
 from tools import anchor as _t_anchor
 from tools import plan as _t_plan
 from tools import dream as _t_dream
+from tools import body as _t_body
 from tools import i as _t_i
 
 # --- Load config & init logging / 加载配置 & 初始化日志 ---
@@ -971,6 +972,44 @@ async def pulse(include_archive: Optional[bool] = False) -> str:
         _t_anchor.pulse(include_archive=include_archive),
         op="pulse",
         args={"include_archive": include_archive},
+    )
+
+
+@mcp.tool()
+async def body(
+    action: Optional[str] = "read",
+    tension: Optional[float] = -1,
+    warmth: Optional[float] = -1,
+    rhythm: Optional[float] = -1,
+    note: Optional[str] = "",
+) -> str:
+    """读取或更新身体状态。状态会随时间自然衰减回基线。
+
+    action:
+      - "read": 读取当前状态（默认）
+      - "set": 设置绝对值（0–1），-1 表示不改
+      - "shift": 按增量调整（如 tension=0.2 表示紧度+0.2）
+      - "reset": 回到基线
+      - "peaks": 查看并清除累积的峰值事件
+
+    三个维度：
+      - tension (紧度 0–1): 内在的紧/松
+      - warmth  (温度 0–1): 情感温度
+      - rhythm  (节奏 0–1): 内在节奏（0=静止，1=狂跳）
+
+    系统会将三维状态映射为一个和弦（如 Gmaj7·温暖明亮）。
+    维度 ≥ 0.85 时自动记录为峰值事件，可用于沉淀到记忆。
+    """
+    return await _with_notice(
+        _t_body.dispatch(
+            action=action or "read", tension=tension, warmth=warmth,
+            rhythm=rhythm, note=note or "",
+        ),
+        op="body",
+        args={
+            "action": action, "tension": tension, "warmth": warmth,
+            "rhythm": rhythm,
+        },
     )
 
 

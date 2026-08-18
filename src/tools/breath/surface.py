@@ -452,6 +452,13 @@ async def surface_default(max_results: int, max_tokens: int, tag_filter: list) -
             rt.logger.warning(f"Dream surface block failed / 偶遇模块异常: {e}")
 
     parts = []
+    try:
+        from tools.body import compact as _body_compact
+        body_line = _body_compact()
+        if body_line:
+            parts.append(body_line)
+    except Exception:
+        pass
     if core_filter_notice:
         parts.append(core_filter_notice)
     if pinned_results:
