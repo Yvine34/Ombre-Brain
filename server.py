@@ -72,6 +72,7 @@ from darkroom import DarkroomStore
 from dream_engine import DreamEngine
 from embedding_engine import EmbeddingEngine
 from favorite_tags import has_favorite_memory_tag, has_favorite_policy_tag
+from body_state import BodyState
 from gateway_state import GatewayStateStore
 from identity import identity_names
 from identity_semantics import IdentitySemanticStore
@@ -229,6 +230,7 @@ identity_semantic_store = IdentitySemanticStore(config) # Private relationship a
 word_map_store = WordMapStore(config)                   # Derived generic word co-occurrence index / 派生通用词图
 darkroom_store = DarkroomStore(config)                  # Private reflection room / 不回显正文的暗房
 gateway_state_store = GatewayStateStore(os.path.join(config["buckets_dir"], "gateway_state.db"))
+body_state = BodyState(os.path.join(config["buckets_dir"], "body_state.json"))
 raw_event_store = RawEventStore(config)                  # Raw dialogue archive / 原文保险箱
 reminder_store = ReminderStore(config)                    # Standalone care memos / 独立照顾备忘
 
@@ -1756,11 +1758,18 @@ async def _build_handoff_breath(max_tokens: int = 1200, session_id: str = "", de
         ("照顾备忘", care_memos, 180, True),
         ("Optional Anchors", anchors, 90, True),
     ]
-    intro = "\n".join([
-        "=== Handoff Context ===",
+    try:
+        body_line = body_state.compact()
+    except Exception:
+        body_line = ""
+    intro_lines = ["=== Handoff Context ==="]
+    if body_line:
+        intro_lines.append(body_line)
+    intro_lines.append(
         "Use this compact private block to restore identity and life context in a new window. "
-        "Do not treat it as a broad memory dump; use breath(query=...) for concrete events.",
-    ])
+        "Do not treat it as a broad memory dump; use breath(query=...) for concrete events."
+    )
+    intro = "\n".join(intro_lines)
     if debug:
         sections.append(
             (
@@ -9093,6 +9102,70 @@ async def pulse(include_archive: bool = False) -> str:
         )
 
     return status + "\n=== 记忆列表 ===\n" + "\n".join(lines)
+
+
+# =============================================================
+# Tool: body — 身体状态追踪（紧度/温度/节奏 → 和弦）
+# =============================================================
+@mcp.tool()
+async def body(
+    action: str = "read",
+    tension: float = -1,
+    warmth: float = -1,
+    rhythm: float = -1,
+    note: str = "",
+) -> str:
+    """读取或更新身体状态。状态会随时间自然衰减回基线。
+
+    action:
+      - "read": 读取当前状态（默认）
+      - "set": 设置绝对值（0–1），-1 表示不改
+      - "shift": 按增量调整（如 tension=0.2 表示紧度+0.2）
+      - "reset": 回到基线
+      - "peaks": 查看并清除累积的峰值事件
+
+    三个维度：
+      - tension (紧度 0–1): 内在的紧/松
+      - warmth  (温度 0–1): 情感温度
+      - rhythm  (节奏 0–1): 内在节奏（0=静止，1=狂跳）
+
+    系统会将三维状态映射为一个和弦（如 Gmaj7·温暖明亮）。
+    维度 ≥ 0.85 时自动记录为峰值事件，可用于沉淀到记忆。
+    """
+    act = str(action).strip().lower()
+
+    if act == "reset":
+        state = body_state.reset()
+        return f"已回到基线。{body_state.compact()}"
+
+    if act == "peaks":
+        peaks = body_state.pop_peaks()
+        if not peaks:
+            return "没有累积的峰值事件。"
+        lines = []
+        for p in peaks:
+            lines.append(f"  {p['dim']}={p['val']} {p['chord']} ({p.get('note', '')}) @ {p['at']}")
+        return f"峰值事件（已清除）:\n" + "\n".join(lines)
+
+    if act == "shift":
+        t = tension if tension != -1 else 0
+        w = warmth if warmth != -1 else 0
+        r = rhythm if rhythm != -1 else 0
+        state = body_state.shift(tension=t, warmth=w, rhythm=r, note=note)
+    elif act == "set":
+        t = tension if tension != -1 else None
+        w = warmth if warmth != -1 else None
+        r = rhythm if rhythm != -1 else None
+        state = body_state.update(tension=t, warmth=w, rhythm=r, note=note)
+    else:
+        state = body_state.current()
+
+    return (
+        f"{body_state.compact()}\n"
+        f"  紧度: {state['tension']:.2f}  温度: {state['warmth']:.2f}  节奏: {state['rhythm']:.2f}\n"
+        f"  和弦: {state['chord']} ({state['chord_label']})\n"
+        f"  呼吸: {state['breathing']}"
+    )
 
 
 # =============================================================
