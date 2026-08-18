@@ -6,6 +6,7 @@ web/nous_api.py — Nous 前端专用 REST 接口（免鉴权）
 GET  /api/nous/buckets?domain=diary     — 按 domain 筛选桶，返回完整内容
 GET  /api/nous/buckets?tags=whisper     — 按 tags 筛选桶
 GET  /api/nous/bucket/{id}              — 读取单个桶完整内容
+POST /api/nous/bucket/{id}/comments     — 给桶追加评论
 
 不需要鉴权，供 Nous 前端直接调用。
 
@@ -13,9 +14,12 @@ GET  /api/nous/bucket/{id}              — 读取单个桶完整内容
 ========================================
 """
 
+import frontmatter
+
 from starlette.requests import Request
 from starlette.responses import Response
 
+from utils import generate_bucket_id, now_iso
 from . import _shared as sh
 
 
@@ -80,3 +84,49 @@ def register(mcp) -> None:
             return JSONResponse(_bucket_to_dict(b))
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
+
+    @mcp.custom_route("/api/nous/bucket/{bucket_id}/comments", methods=["POST"])
+    async def api_nous_bucket_comment(request: Request) -> Response:
+        from starlette.responses import JSONResponse
+        bucket_id = request.path_params["bucket_id"]
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "invalid json"}, status_code=400)
+        content = str(body.get("content") or "").strip()
+        if not content:
+            return JSONResponse({"error": "content required"}, status_code=400)
+
+        file_path = sh.bucket_mgr._find_bucket_file(bucket_id)
+        if not file_path:
+            return JSONResponse({"error": "not found"}, status_code=404)
+
+        try:
+            post = frontmatter.load(file_path)
+        except Exception:
+            return JSONResponse({"error": "read failed"}, status_code=500)
+
+        comments = post.get("comments", [])
+        if not isinstance(comments, list):
+            comments = []
+
+        now = now_iso()
+        entry = {
+            "id": generate_bucket_id(),
+            "created": now,
+            "author": str(body.get("author") or "小颖"),
+            "kind": "comment",
+            "content": content,
+        }
+        comments.append(entry)
+        post["comments"] = comments
+        post["comment_count"] = len(comments)
+        post["updated_at"] = now
+
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(frontmatter.dumps(post))
+        except Exception:
+            return JSONResponse({"error": "write failed"}, status_code=500)
+
+        return JSONResponse({"status": "commented", "id": bucket_id, "comment": entry})
