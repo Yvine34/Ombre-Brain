@@ -34,6 +34,7 @@ from . import onboarding
 from . import v3_debug
 from . import body_api
 from . import avatar_api
+from . import nous_api
 
 
 _WEB_MODULES = (
@@ -57,6 +58,7 @@ _WEB_MODULES = (
     ("web.v3_debug", v3_debug.register),
     ("web.body_api", body_api.register),
     ("web.avatar_api", avatar_api.register),
+    ("web.nous_api", nous_api.register),
 )
 
 
