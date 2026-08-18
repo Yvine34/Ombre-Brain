@@ -4118,6 +4118,12 @@ async def _merge_or_create(
             or _is_profile_fact_bucket(bucket)
         ):
             try:
+                from originals import append_original
+                append_original(bucket_mgr.base_dir, bucket["id"], "合并前的旧内容", bucket["content"])
+                append_original(bucket_mgr.base_dir, bucket["id"], "合并进来的新内容", content)
+            except Exception as _oe:
+                logger.error(f"原文备份失败（不影响正常运行）: {_oe}")
+            try:
                 merged = await dehydrator.merge(bucket["content"], content)
                 merged = _normalize_memory_sections_for_write(merged)
                 old_v = bucket["metadata"].get("valence", 0.5)
@@ -8696,6 +8702,13 @@ async def grow(content: str, auto: bool = False, source: str = "", title: str = 
         return f"{gate_prefix}{action} → {result_name} | {','.join(analysis.get('domain', []))} V{analysis.get('valence', 0.5):.1f}/A{analysis.get('arousal', 0.3):.1f}{related_note}"
 
     # --- Step 1: let API split and organize / 让 API 拆分整理 ---
+    try:
+        from originals import append_original
+        _grow_backup_id = f"g_{__import__('uuid').uuid4().hex[:12]}"
+        _ok = append_original(bucket_mgr.base_dir, _grow_backup_id, "日记原文", content)
+        logger.info(f"原文备份: {_grow_backup_id} ok={_ok}")
+    except Exception as _oe:
+        logger.error(f"原文备份失败（不影响正常运行）: {_oe}")
     try:
         items = await dehydrator.digest(content)
     except Exception as e:
