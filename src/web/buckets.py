@@ -113,7 +113,7 @@ def register(mcp) -> None:
         """Return metadata-only memory stars for the trusted Xinchao sidecar."""
         from starlette.responses import JSONResponse
 
-        configured = os.environ.get("OMBRE_MCP_SERVICE_TOKEN", "").strip()
+        configured = os.environ.get("OMBRE_MCP_TOKEN", "").strip()
         auth = request.headers.get("Authorization", "")
         supplied = auth[7:].strip() if auth.startswith("Bearer ") else ""
         if (
