@@ -11,7 +11,9 @@ web/buckets.py — 记忆桶管理 + 设置 + 锚点 + 自我认知读取
 ========================================
 """
 
+import hmac
 import math
+import os
 import threading
 import unicodedata
 from contextlib import AsyncExitStack
@@ -104,6 +106,57 @@ def register(mcp) -> None:
     # 每次路由注册使用一个原生提交锁，不与 asyncio 事件循环绑定；临界区内
     # 不执行 await，因此既能跨测试事件循环串行化，也不会因持锁等待而死锁。
     sampling_commit_lock = threading.Lock()
+
+
+    @mcp.custom_route("/api/bucket-map", methods=["GET"])
+    async def api_bucket_map(request: Request) -> Response:
+        """Return metadata-only memory stars for the trusted Xinchao sidecar."""
+        from starlette.responses import JSONResponse
+
+        configured = os.environ.get("OMBRE_MCP_SERVICE_TOKEN", "").strip()
+        auth = request.headers.get("Authorization", "")
+        supplied = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        if (
+            len(configured) < 32
+            or len(supplied) != len(configured)
+            or not hmac.compare_digest(supplied, configured)
+        ):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        try:
+            all_buckets = await sh.bucket_mgr.list_all(include_archive=True)
+            stars = []
+            stats = {"pinned": 0, "dynamic": 0, "archived": 0}
+            for bucket in all_buckets:
+                meta = bucket.get("metadata", {})
+                if meta.get("deleted_at"):
+                    continue
+                bucket_type = meta.get("type", "dynamic")
+                if meta.get("pinned") or bucket_type == "permanent":
+                    stats["pinned"] += 1
+                elif bucket_type == "archive":
+                    stats["archived"] += 1
+                else:
+                    stats["dynamic"] += 1
+                stars.append({
+                    "id": bucket["id"],
+                    "name": meta.get("name", bucket["id"]),
+                    "type": bucket_type,
+                    "domain": meta.get("domain", []),
+                    "tags": meta.get("tags", []),
+                    "valence": meta.get("valence", 0.5),
+                    "arousal": meta.get("arousal", 0.3),
+                    "importance": meta.get("importance", 5),
+                    "resolved": meta.get("resolved", False),
+                    "pinned": meta.get("pinned", False),
+                    "created_at": meta.get("created", ""),
+                    "last_active": meta.get("last_active", ""),
+                    "activation_count": meta.get("activation_count", 0),
+                    "score": sh.decay_engine.calculate_score(meta),
+                })
+            stars.sort(key=lambda item: item["score"], reverse=True)
+            return JSONResponse({"stats": stats, "total": len(stars), "stars": stars[:800]})
+        except Exception as error:
+            return JSONResponse({"error": str(error)}, status_code=500)
 
     @mcp.custom_route("/api/buckets", methods=["GET"])
     async def api_buckets(request: Request) -> Response:
